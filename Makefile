@@ -364,3 +364,58 @@ undeploy-aws: ## Uninstall all Helm charts from remote cluster
 	helm uninstall jk8-aws-traefik-dex -n jupyter-k8s-router --ignore-not-found
 	helm uninstall aws-hyperpod -n jupyter-k8s-system --ignore-not-found
 	helm uninstall traefik-crd --ignore-not-found
+
+##@ Samples
+
+WS_NAMESPACE ?= default
+
+.PHONY: apply-sample-oidc
+apply-sample-oidc: ## Create sample OIDC workspaces with access strategies
+	@( \
+		set -e; \
+		. ./.env; \
+		export DOMAIN=$${TRAEFIK_DEX_DOMAIN:-$$HYPERPOD_DOMAIN}; \
+		kubectl apply -f samples/oidc/workspace_access_strategy.yaml --dry-run=client -o yaml | envsubst | kubectl apply -f -; \
+		kubectl apply -f samples/oidc/workspace_access_strategy_bearer.yaml --dry-run=client -o yaml | envsubst | kubectl apply -f -; \
+		kubectl apply -k samples/oidc --dry-run=client -o yaml | envsubst | kubectl apply -f -; \
+	)
+
+.PHONY: delete-sample-oidc
+delete-sample-oidc: ## Delete sample OIDC workspaces and access strategies
+	kubectl delete -k samples/oidc
+	kubectl delete -f samples/oidc/workspace_access_strategy.yaml
+	kubectl delete -f samples/oidc/workspace_access_strategy_bearer.yaml
+
+.PHONY: apply-sample-hyperpod
+apply-sample-hyperpod: ## Create sample hyperpod workspaces. Usage: make apply-sample-hyperpod WS_USER=alice
+	@if [ -z "$(WS_USER)" ]; then echo "WS_USER is required. Usage: make apply-sample-hyperpod WS_USER=alice"; exit 1; fi
+	@echo "Creating sample hyperpod workspaces for '$(WS_USER)'..."
+	export WS_USER=$(WS_USER); \
+	kubectl apply -k samples/hyperpod --dry-run=client -o yaml | envsubst | kubectl apply -f -
+
+.PHONY: delete-sample-hyperpod
+delete-sample-hyperpod: ## Delete sample hyperpod workspaces. Usage: make delete-sample-hyperpod WS_USER=alice
+	@if [ -z "$(WS_USER)" ]; then echo "WS_USER is required. Usage: make delete-sample-hyperpod WS_USER=alice"; exit 1; fi
+	@echo "Deleting sample hyperpod workspaces for '$(WS_USER)'..."
+	export WS_USER=$(WS_USER); \
+	kubectl apply -k samples/hyperpod --dry-run=client -o yaml | envsubst | kubectl delete -f -
+
+.PHONY: bearer-token
+bearer-token: ## Create a bearer token URL for a workspace. Usage: make bearer-token WS_NAME=<name> [WS_NAMESPACE=default]
+	@bash -c '\
+		RESULT=$$(kubectl create --raw "/apis/connection.workspace.jupyter.org/v1alpha1/namespaces/$(WS_NAMESPACE)/workspaceconnections" \
+			-f <(echo '"'"'{"apiVersion":"connection.workspace.jupyter.org/v1alpha1","kind":"WorkspaceConnection","metadata":{"namespace":"$(WS_NAMESPACE)"},"spec":{"workspaceName":"$(WS_NAME)","workspaceConnectionType":"web-ui"}}'"'"') 2>&1) && \
+		URL=$$(echo "$$RESULT" | jq -r ".status.workspaceConnectionUrl // empty") && \
+		echo "$$URL" || \
+		{ echo "$$RESULT"; exit 1; } \
+	'
+
+.PHONY: vscode-token
+vscode-token: ## Create a VS Code remote connection URL. Usage: make vscode-token WS_NAME=<name> [WS_NAMESPACE=default]
+	@bash -c '\
+		RESULT=$$(kubectl create --raw "/apis/connection.workspace.jupyter.org/v1alpha1/namespaces/$(WS_NAMESPACE)/workspaceconnections" \
+			-f <(echo '"'"'{"apiVersion":"connection.workspace.jupyter.org/v1alpha1","kind":"WorkspaceConnection","metadata":{"namespace":"$(WS_NAMESPACE)"},"spec":{"workspaceName":"$(WS_NAME)","workspaceConnectionType":"vscode-remote"}}'"'"') 2>&1) && \
+		URL=$$(echo "$$RESULT" | jq -r ".status.workspaceConnectionUrl // empty") && \
+		echo "$$URL" || \
+		{ echo "$$RESULT"; exit 1; } \
+	'
