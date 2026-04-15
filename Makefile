@@ -32,35 +32,33 @@ CHART_TRAEFIK_DEX := $(CHARTS_DIR)/aws-traefik-dex
 # Guided deployment
 OAUTH2P_COOKIE_SECRET := $(shell openssl rand -base64 32 | tr -- '+/' '-_')
 
-# AWS configuration (resolved when CLOUD_PROVIDER=aws)
+# AWS configuration
 # Resolution order (highest priority first):
 #   1. Command line: make deploy-aws-traefik-dex AWS_REGION=us-east-2
 #   2. .env file: AWS_REGION=us-east-2
 #   3. Defaults: us-west-2 / jupyter-k8s-cluster
-ifeq ($(CLOUD_PROVIDER),aws)
-	ifneq (,$(wildcard .env))
-		ifneq ($(origin AWS_REGION),command line)
-			_ENV_AWS_REGION := $(shell grep -s '^AWS_REGION=' .env | cut -d= -f2)
-			ifneq (,$(_ENV_AWS_REGION))
-				AWS_REGION := $(_ENV_AWS_REGION)
-			endif
-		endif
-		ifneq ($(origin EKS_CLUSTER_NAME),command line)
-			_ENV_EKS_CLUSTER := $(shell grep -s '^EKS_CLUSTER_NAME=' .env | cut -d= -f2)
-			ifneq (,$(_ENV_EKS_CLUSTER))
-				EKS_CLUSTER_NAME := $(_ENV_EKS_CLUSTER)
-			endif
+ifneq (,$(wildcard .env))
+	ifneq ($(origin AWS_REGION),command line)
+		_ENV_AWS_REGION := $(shell grep -s '^AWS_REGION=' .env | cut -d= -f2)
+		ifneq (,$(_ENV_AWS_REGION))
+			AWS_REGION := $(_ENV_AWS_REGION)
 		endif
 	endif
-	AWS_REGION ?= us-west-2
-	EKS_CLUSTER_NAME ?= jupyter-k8s-cluster
-	AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query "Account" --output text)
-	ECR_REGISTRY := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-	ECR_REPOSITORY_AWS_PLUGIN := jupyter-k8s-aws-plugin
-	ECR_REPOSITORY_AUTH := jupyter-k8s-auth
-	ECR_REPOSITORY_ROTATOR := jupyter-k8s-rotator
-	EKS_CONTEXT := arn:aws:eks:$(AWS_REGION):$(AWS_ACCOUNT_ID):cluster/$(EKS_CLUSTER_NAME)
+	ifneq ($(origin EKS_CLUSTER_NAME),command line)
+		_ENV_EKS_CLUSTER := $(shell grep -s '^EKS_CLUSTER_NAME=' .env | cut -d= -f2)
+		ifneq (,$(_ENV_EKS_CLUSTER))
+			EKS_CLUSTER_NAME := $(_ENV_EKS_CLUSTER)
+		endif
+	endif
 endif
+AWS_REGION ?= us-west-2
+EKS_CLUSTER_NAME ?= jupyter-k8s-cluster
+AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query "Account" --output text)
+ECR_REGISTRY := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+ECR_REPOSITORY_AWS_PLUGIN := jupyter-k8s-aws-plugin
+ECR_REPOSITORY_AUTH := jupyter-k8s-auth
+ECR_REPOSITORY_ROTATOR := jupyter-k8s-rotator
+EKS_CONTEXT := arn:aws:eks:$(AWS_REGION):$(AWS_ACCOUNT_ID):cluster/$(EKS_CLUSTER_NAME)
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 SHELL = /usr/bin/env bash -o pipefail
@@ -188,13 +186,25 @@ image-build: ## Build aws-plugin container image
 image-push: ## Push aws-plugin container image
 	$(CONTAINER_TOOL) push $(IMG)
 
+.PHONY: ecr-create
+ecr-create: ## Create ECR repository for aws-plugin
+	@echo "Creating ECR repository for aws-plugin if it doesn't exist..."
+	@aws ecr describe-repositories --repository-names $(ECR_REPOSITORY_AWS_PLUGIN) --region $(AWS_REGION) > /dev/null 2>&1 || \
+		aws ecr create-repository --repository-name $(ECR_REPOSITORY_AWS_PLUGIN) --region $(AWS_REGION)
+
+.PHONY: ecr-push
+ecr-push: ## Build and push aws-plugin image to ECR
+	@aws ecr get-login-password --region $(AWS_REGION) | \
+		$(CONTAINER_TOOL) login --username AWS --password-stdin $(ECR_REGISTRY)
+	$(CONTAINER_TOOL) build $(BUILD_OPTS) --platform=linux/amd64 \
+		-t $(ECR_REGISTRY)/$(ECR_REPOSITORY_AWS_PLUGIN):latest -f Dockerfile .
+	$(CONTAINER_TOOL) push $(ECR_REGISTRY)/$(ECR_REPOSITORY_AWS_PLUGIN):latest
+	@echo "AWS plugin image pushed to $(ECR_REGISTRY)/$(ECR_REPOSITORY_AWS_PLUGIN):latest"
+
 ##@ AWS Deployment
 
 .PHONY: setup-aws
 setup-aws: ## Setup connection to remote EKS cluster
-	$(MAKE) setup-aws-internal CLOUD_PROVIDER=aws
-
-setup-aws-internal:
 	@echo "Setting up remote cluster connection..."
 	@if [ -n "$(EKS_CLUSTER_NAME)" ]; then \
 		echo "Getting kubeconfig from EKS cluster $(EKS_CLUSTER_NAME)..."; \
@@ -221,9 +231,6 @@ setup-aws-internal:
 
 .PHONY: kubectl-aws
 kubectl-aws: ## Configure kubectl to use remote cluster
-	$(MAKE) kubectl-aws-internal CLOUD_PROVIDER=aws
-
-kubectl-aws-internal:
 	@echo "Setting up kubectl to use remote cluster..."
 	@if kubectl config get-contexts | grep -q "$(EKS_CLUSTER_NAME)"; then \
 		echo "Switching to EKS cluster context..."; \
@@ -236,9 +243,6 @@ kubectl-aws-internal:
 
 .PHONY: deploy-aws-traefik-dex
 deploy-aws-traefik-dex: ## Deploy aws-traefik-dex chart from .env config
-	$(MAKE) deploy-aws-traefik-dex-internal CLOUD_PROVIDER=aws
-
-deploy-aws-traefik-dex-internal:
 	@if [ ! -f .env ]; then \
 		echo ".env file not found. Copy .env.example to .env and edit the values."; \
 		echo "Required: TRAEFIK_DEX_DOMAIN, LETSENCRYPT_EMAIL, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_ORG_NAME"; \
@@ -306,9 +310,6 @@ deploy-aws-traefik-dex-internal:
 
 .PHONY: deploy-aws-hyperpod
 deploy-aws-hyperpod: ## Deploy aws-hyperpod chart from .env config
-	$(MAKE) deploy-aws-hyperpod-internal CLOUD_PROVIDER=aws
-
-deploy-aws-hyperpod-internal:
 	@if [ ! -f .env ]; then \
 		echo ".env file not found. Copy .env.example to .env and edit the values."; \
 		echo "Required: HYPERPOD_DOMAIN, ACM_CERT_ARN"; \
