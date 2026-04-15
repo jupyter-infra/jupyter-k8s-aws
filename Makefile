@@ -178,11 +178,11 @@ helm-test: helm-test-aws-traefik-dex helm-test-aws-hyperpod ## Run all Helm test
 .PHONY: build-aws-plugin
 build-aws-plugin: ## Build aws-plugin sidecar image for local testing
 	@echo "Building aws-plugin image..."
-	$(CONTAINER_TOOL) build $(BUILD_OPTS) -t docker.io/library/aws-plugin:local -f images/aws-plugin/Dockerfile .
+	$(CONTAINER_TOOL) build $(BUILD_OPTS) -t docker.io/library/aws-plugin:local -f Dockerfile .
 
 .PHONY: image-build
 image-build: ## Build aws-plugin container image
-	$(CONTAINER_TOOL) build $(BUILD_OPTS) -t $(IMG) -f images/aws-plugin/Dockerfile .
+	$(CONTAINER_TOOL) build $(BUILD_OPTS) -t $(IMG) -f Dockerfile .
 
 .PHONY: image-push
 image-push: ## Push aws-plugin container image
