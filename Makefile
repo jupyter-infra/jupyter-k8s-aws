@@ -29,6 +29,9 @@ CHARTS_DIR        := charts
 CHART_HYPERPOD    := $(CHARTS_DIR)/aws-hyperpod
 CHART_TRAEFIK_DEX := $(CHARTS_DIR)/aws-traefik-dex
 
+# Path to sibling jupyter-k8s checkout (for controller chart deployment)
+CONTROLLER_DIR ?= ../jupyter-k8s
+
 # Guided deployment
 OAUTH2P_COOKIE_SECRET := $(shell openssl rand -base64 32 | tr -- '+/' '-_')
 
@@ -48,6 +51,12 @@ ifneq (,$(wildcard .env))
 		_ENV_EKS_CLUSTER := $(shell grep -s '^EKS_CLUSTER_NAME=' .env | cut -d= -f2)
 		ifneq (,$(_ENV_EKS_CLUSTER))
 			EKS_CLUSTER_NAME := $(_ENV_EKS_CLUSTER)
+		endif
+	endif
+	ifneq ($(origin CONTROLLER_DIR),command line)
+		_ENV_CONTROLLER_DIR := $(shell grep -s '^CONTROLLER_DIR=' .env | cut -d= -f2)
+		ifneq (,$(_ENV_CONTROLLER_DIR))
+			CONTROLLER_DIR := $(_ENV_CONTROLLER_DIR)
 		endif
 	endif
 endif
@@ -351,8 +360,21 @@ deploy-aws-hyperpod: ## Deploy aws-hyperpod chart from .env config
 	@echo "Restarting authmiddleware deployment to use new images..."
 	-kubectl rollout restart deployment -n jupyter-k8s-system workspace-auth-middleware 2>/dev/null || true
 
-.PHONY: deploy-aws
-deploy-aws: deploy-aws-traefik-dex deploy-aws-hyperpod ## Deploy both charts (aws-traefik-dex + aws-hyperpod)
+.PHONY: deploy-controller
+deploy-controller: ## Deploy jupyter-k8s controller (without aws-plugin sidecar) from sibling repo
+	@if [ ! -d "$(CONTROLLER_DIR)" ]; then \
+		echo "jupyter-k8s repo not found at $(CONTROLLER_DIR). Set CONTROLLER_DIR to the correct path."; \
+		exit 1; \
+	fi
+	$(MAKE) -C $(CONTROLLER_DIR) deploy-aws
+
+.PHONY: deploy-controller-with-plugin
+deploy-controller-with-plugin: ecr-push ## Deploy jupyter-k8s controller with aws-plugin sidecar from sibling repo
+	@if [ ! -d "$(CONTROLLER_DIR)" ]; then \
+		echo "jupyter-k8s repo not found at $(CONTROLLER_DIR). Set CONTROLLER_DIR to the correct path."; \
+		exit 1; \
+	fi
+	$(MAKE) -C $(CONTROLLER_DIR) deploy-aws-with-plugin
 
 .PHONY: undeploy-aws-hyperpod
 undeploy-aws-hyperpod: ## Remove aws-hyperpod chart

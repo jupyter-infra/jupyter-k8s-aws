@@ -9,13 +9,26 @@
 
 ## Getting Started
 
-Clone the repo and download dependencies:
+Clone this repo and the operator repo as siblings, then install dependencies:
 
 ```bash
 git clone https://github.com/jupyter-infra/jupyter-k8s-aws.git
+git clone https://github.com/jupyter-infra/jupyter-k8s.git
 cd jupyter-k8s-aws
 make deps
 ```
+
+The operator repo is needed for controller deployment (`make deploy-controller` /
+`make deploy-controller-with-plugin`). The path defaults to `../jupyter-k8s` and
+can be overridden with `CONTROLLER_DIR` in `.env` or on the command line.
+
+Copy `.env.example` to `.env` and fill in your AWS cluster configuration.
+
+> **Note:** During the migration period, jupyter-k8s still contains its own copy of the
+> aws-plugin source under `images/aws-plugin/`. Its `load-images-aws` target rebuilds and
+> pushes that copy, overwriting the image this repo pushes. Until `images/aws-plugin/` is
+> removed from jupyter-k8s, the image running in the cluster comes from the jupyter-k8s
+> build, not this repo.
 
 ## Development Workflow
 
