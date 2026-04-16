@@ -376,6 +376,12 @@ deploy-controller-with-plugin: ecr-push ## Deploy jupyter-k8s controller with aw
 	fi
 	$(MAKE) -C $(CONTROLLER_DIR) deploy-aws-with-plugin
 
+.PHONY: redeploy-plugin
+redeploy-plugin: ecr-push ## Build, push aws-plugin image and restart the controller to pick it up
+	kubectl rollout restart deployment -n jupyter-k8s-system jupyter-k8s-controller-manager
+	@echo "Waiting for rollout to complete..."
+	kubectl rollout status deployment -n jupyter-k8s-system jupyter-k8s-controller-manager --timeout=120s
+
 .PHONY: undeploy-aws-hyperpod
 undeploy-aws-hyperpod: ## Remove aws-hyperpod chart
 	helm uninstall aws-hyperpod --namespace jupyter-k8s-system
