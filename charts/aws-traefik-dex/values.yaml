@@ -7,6 +7,10 @@ namespace: jupyter-k8s-router
 # Full domain for the application (required)
 domain: ""
 
+# External DNS configuration
+externalDns:
+  enabled: true
+
 
 # [STORAGE] StorageClasses for Workspaces
 storageClass:
