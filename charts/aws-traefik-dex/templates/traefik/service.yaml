@@ -7,6 +7,9 @@ metadata:
     app: traefik
     component: router
   annotations:
+    {{- if .Values.externalDns.enabled }}
+    external-dns.alpha.kubernetes.io/hostname: "{{ .Values.domain }}"
+    {{- end }}
     # Use the legacy annotation (not the newer "external") which does not work in hyperpod
     service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
     service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
