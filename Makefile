@@ -62,12 +62,12 @@ ifneq (,$(wildcard .env))
 endif
 AWS_REGION ?= us-west-2
 EKS_CLUSTER_NAME ?= jupyter-k8s-cluster
-AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query "Account" --output text)
-ECR_REGISTRY := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --query "Account" --output text)
+ECR_REGISTRY = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 ECR_REPOSITORY_AWS_PLUGIN := jupyter-k8s-aws-plugin
 ECR_REPOSITORY_AUTH := jupyter-k8s-auth
 ECR_REPOSITORY_ROTATOR := jupyter-k8s-rotator
-EKS_CONTEXT := arn:aws:eks:$(AWS_REGION):$(AWS_ACCOUNT_ID):cluster/$(EKS_CLUSTER_NAME)
+EKS_CONTEXT = arn:aws:eks:$(AWS_REGION):$(AWS_ACCOUNT_ID):cluster/$(EKS_CLUSTER_NAME)
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 SHELL = /usr/bin/env bash -o pipefail
