@@ -49,6 +49,8 @@ spec:
           value: {{ .Values.webApp.session.secretName | quote }}
         - name: SESSION_SECRET_NAMESPACE
           value: {{ .Values.namespace | quote }}
+        - name: SESSION_KEY_PREFIX
+          value: "jwt-signing-key-"
         - name: SESSION_NEW_KEY_USE_DELAY_SECS
           value: {{ .Values.webApp.session.newKeyUseDelaySecs | quote }}
         - name: SESSION_EXPECTED_DOMAIN
