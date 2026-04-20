@@ -64,7 +64,7 @@ AWS_REGION ?= us-west-2
 EKS_CLUSTER_NAME ?= jupyter-k8s-cluster
 AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --query "Account" --output text)
 ECR_REGISTRY = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-ECR_REPOSITORY := jupyter-k8s
+ECR_REPOSITORY_CONTROLLER := jupyter-k8s
 ECR_REPOSITORY_AWS_PLUGIN := jupyter-k8s-aws-plugin
 ECR_REPOSITORY_AUTH := jupyter-k8s-auth
 ECR_REPOSITORY_ROTATOR := jupyter-k8s-rotator
@@ -373,7 +373,7 @@ deploy-controller: ## Deploy jupyter-k8s controller (without aws-plugin sidecar)
 	helm upgrade --install jk8s $(CONTROLLER_DIR)/dist/chart \
 		--namespace jupyter-k8s-system --create-namespace \
 		--set controllerManager.container.imagePullPolicy=Always \
-		--set controllerManager.container.image.repository=$(ECR_REGISTRY)/$(ECR_REPOSITORY) \
+		--set controllerManager.container.image.repository=$(ECR_REGISTRY)/$(ECR_REPOSITORY_CONTROLLER) \
 		--set controllerManager.container.image.tag=latest \
 		--set application.imagesPullPolicy=Always \
 		--set application.imagesRegistry=$(ECR_REGISTRY) \
@@ -398,7 +398,7 @@ deploy-controller-with-plugin: ecr-push ## Deploy jupyter-k8s controller with aw
 	helm upgrade --install jk8s $(CONTROLLER_DIR)/dist/chart \
 		--namespace jupyter-k8s-system --create-namespace \
 		--set controllerManager.container.imagePullPolicy=Always \
-		--set controllerManager.container.image.repository=$(ECR_REGISTRY)/$(ECR_REPOSITORY) \
+		--set controllerManager.container.image.repository=$(ECR_REGISTRY)/$(ECR_REPOSITORY_CONTROLLER) \
 		--set controllerManager.container.image.tag=latest \
 		--set application.imagesPullPolicy=Always \
 		--set application.imagesRegistry=$(ECR_REGISTRY) \
