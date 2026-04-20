@@ -64,6 +64,7 @@ AWS_REGION ?= us-west-2
 EKS_CLUSTER_NAME ?= jupyter-k8s-cluster
 AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --query "Account" --output text)
 ECR_REGISTRY = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+ECR_REPOSITORY_CONTROLLER := jupyter-k8s
 ECR_REPOSITORY_AWS_PLUGIN := jupyter-k8s-aws-plugin
 ECR_REPOSITORY_AUTH := jupyter-k8s-auth
 ECR_REPOSITORY_ROTATOR := jupyter-k8s-rotator
@@ -361,20 +362,64 @@ deploy-aws-hyperpod: ## Deploy aws-hyperpod chart from .env config
 	-kubectl rollout restart deployment -n jupyter-k8s-system workspace-auth-middleware 2>/dev/null || true
 
 .PHONY: deploy-controller
-deploy-controller: ## Deploy jupyter-k8s controller (without aws-plugin sidecar) from sibling repo
+deploy-controller: ## Deploy jupyter-k8s controller (without aws-plugin sidecar)
 	@if [ ! -d "$(CONTROLLER_DIR)" ]; then \
 		echo "jupyter-k8s repo not found at $(CONTROLLER_DIR). Set CONTROLLER_DIR to the correct path."; \
 		exit 1; \
 	fi
-	$(MAKE) -C $(CONTROLLER_DIR) deploy-aws
+	$(MAKE) -C $(CONTROLLER_DIR) load-images-aws helm-generate \
+		AWS_REGION=$(AWS_REGION) EKS_CLUSTER_NAME=$(EKS_CLUSTER_NAME)
+	@echo "Deploying jupyter-k8s controller to remote AWS cluster..."
+	helm upgrade --install jk8s $(CONTROLLER_DIR)/dist/chart \
+		--namespace jupyter-k8s-system --create-namespace \
+		--set controllerManager.container.imagePullPolicy=Always \
+		--set controllerManager.container.image.repository=$(ECR_REGISTRY)/$(ECR_REPOSITORY_CONTROLLER) \
+		--set controllerManager.container.image.tag=latest \
+		--set application.imagesPullPolicy=Always \
+		--set application.imagesRegistry=$(ECR_REGISTRY) \
+		--set workspacePodWatching.enable=true \
+		--set extensionApi.enable=true \
+		--set extensionApi.jwtSecret.enable=true \
+		--set extensionApi.jwtSecret.rotator.repository=$(ECR_REGISTRY) \
+		--set extensionApi.jwtSecret.rotator.imageName=$(ECR_REPOSITORY_ROTATOR) \
+		--set workspaceTemplates.defaultNamespace=jupyter-k8s-system
+	kubectl rollout restart deployment -n jupyter-k8s-system jupyter-k8s-controller-manager
+	@echo "Controller deployed successfully."
 
 .PHONY: deploy-controller-with-plugin
-deploy-controller-with-plugin: ecr-push ## Deploy jupyter-k8s controller with aws-plugin sidecar from sibling repo
+deploy-controller-with-plugin: ecr-push ## Deploy jupyter-k8s controller with aws-plugin sidecar
 	@if [ ! -d "$(CONTROLLER_DIR)" ]; then \
 		echo "jupyter-k8s repo not found at $(CONTROLLER_DIR). Set CONTROLLER_DIR to the correct path."; \
 		exit 1; \
 	fi
-	$(MAKE) -C $(CONTROLLER_DIR) deploy-aws-with-plugin
+	$(MAKE) -C $(CONTROLLER_DIR) load-images-aws helm-generate \
+		AWS_REGION=$(AWS_REGION) EKS_CLUSTER_NAME=$(EKS_CLUSTER_NAME)
+	@echo "Deploying jupyter-k8s controller with aws-plugin sidecar..."
+	helm upgrade --install jk8s $(CONTROLLER_DIR)/dist/chart \
+		--namespace jupyter-k8s-system --create-namespace \
+		--set controllerManager.container.imagePullPolicy=Always \
+		--set controllerManager.container.image.repository=$(ECR_REGISTRY)/$(ECR_REPOSITORY_CONTROLLER) \
+		--set controllerManager.container.image.tag=latest \
+		--set application.imagesPullPolicy=Always \
+		--set application.imagesRegistry=$(ECR_REGISTRY) \
+		--set workspacePodWatching.enable=true \
+		--set extensionApi.enable=true \
+		--set extensionApi.jwtSecret.enable=true \
+		--set extensionApi.jwtSecret.rotator.repository=$(ECR_REGISTRY) \
+		--set extensionApi.jwtSecret.rotator.imageName=$(ECR_REPOSITORY_ROTATOR) \
+		--set workspaceTemplates.defaultNamespace=jupyter-k8s-system \
+		--set controller.plugins[0].name=aws \
+		--set controller.plugins[0].image.repository=$(ECR_REGISTRY)/$(ECR_REPOSITORY_AWS_PLUGIN) \
+		--set controller.plugins[0].image.tag=latest \
+		--set controller.plugins[0].port=8080 \
+		--set controller.plugins[0].imagePullPolicy=Always \
+		--set 'controller.plugins[0].healthcheckCommand[0]=/aws-plugin' \
+		--set 'controller.plugins[0].healthcheckCommand[1]=--healthcheck' \
+		--set controller.plugins[0].env.PLUGIN_PORT=8080 \
+		--set controller.plugins[0].env.AWS_REGION=$(AWS_REGION) \
+		--set controller.plugins[0].env.CLUSTER_ID=$(EKS_CONTEXT)
+	kubectl rollout restart deployment -n jupyter-k8s-system jupyter-k8s-controller-manager
+	@echo "Controller with aws-plugin deployed successfully."
 
 .PHONY: redeploy-plugin
 redeploy-plugin: ecr-push ## Build, push aws-plugin image and restart the controller to pick it up
