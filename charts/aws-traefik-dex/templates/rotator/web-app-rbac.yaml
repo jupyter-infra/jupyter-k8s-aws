@@ -1,37 +1,36 @@
-{{- if and .Values.authmiddleware.enabled .Values.rotator.enabled }}
+{{- if and .Values.webApp.enabled .Values.rotator.enabled }}
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: jwt-rotator
+  name: web-app-session-rotator
   namespace: {{ .Values.namespace }}
   labels:
-    app: jwt-rotator
+    app: web-app-session-rotator
     component: security
 ---
-# Role for managing JWT signing secrets (key rotation)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: jwt-rotator-role
+  name: web-app-session-rotator-role
   namespace: {{ .Values.namespace }}
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
-    resourceNames: ["{{ .Values.authmiddleware.secretName }}"]
+    resourceNames: ["{{ .Values.webApp.session.secretName }}"]
     verbs: ["get", "update", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: jwt-rotator-rolebinding
+  name: web-app-session-rotator-rolebinding
   namespace: {{ .Values.namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: jwt-rotator-role
+  name: web-app-session-rotator-role
 subjects:
   - kind: ServiceAccount
-    name: jwt-rotator
+    name: web-app-session-rotator
     namespace: {{ .Values.namespace }}
 {{- end }}

@@ -320,11 +320,13 @@ deploy-aws-traefik-dex: ## Deploy aws-traefik-dex chart from .env config
 			9800 \
 			dist/users-scripts/set-kubeconfig.sh \
 			"$$(kubectl get configmap dex-config -n jupyter-k8s-router -o jsonpath='{.data.config\.yaml}' | awk '/id: kubectl-oidc/{found=1} found && /secret:/{print $$2; exit}')"; \
+		echo "Restarting deployments to use new images..."; \
+		kubectl rollout restart deployment -n jupyter-k8s-router \
+			traefik oauth2-proxy dex authmiddleware; \
+		if [ "$$WEB_APP_ENABLED" = "true" ]; then \
+			kubectl rollout restart deployment -n jupyter-k8s-router web-app; \
+		fi; \
 	)
-	@echo "Restarting deployments to use new images..."
-	kubectl rollout restart deployment -n jupyter-k8s-router \
-		traefik oauth2-proxy dex authmiddleware
-	-kubectl rollout restart deployment -n jupyter-k8s-router web-app 2>/dev/null || true
 	rm -rf /tmp/jk8s-aws-traefik-dex
 	@echo "Bash script for end-users to set their kubeconfig available at: dist/users-scripts"
 

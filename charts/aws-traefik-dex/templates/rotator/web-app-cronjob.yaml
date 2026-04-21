@@ -21,7 +21,7 @@ spec:
             app: web-app-session-rotator
             component: security
         spec:
-          serviceAccountName: jwt-rotator
+          serviceAccountName: web-app-session-rotator
           restartPolicy: OnFailure
           securityContext:
             runAsUser: 65532
