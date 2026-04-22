@@ -1,0 +1,57 @@
+{{- if and .Values.webApp.enabled .Values.rotator.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: web-app-session-rotator
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: web-app-session-rotator
+    component: security
+spec:
+  schedule: {{ include "defaulter.rotationCronSchedule" . | quote | trim }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app: web-app-session-rotator
+            component: security
+        spec:
+          serviceAccountName: web-app-session-rotator
+          restartPolicy: OnFailure
+          securityContext:
+            runAsUser: 65532
+            runAsGroup: 65532
+            runAsNonRoot: true
+            fsGroup: 65532
+          containers:
+          - name: rotator
+            image: {{ .Values.rotator.repository }}/{{ .Values.rotator.imageName }}:{{ .Values.rotator.imageTag }}
+            imagePullPolicy: {{ .Values.rotator.imagePullPolicy }}
+            resources:
+              requests:
+                cpu: {{ .Values.rotator.resources.requests.cpu }}
+                memory: {{ .Values.rotator.resources.requests.memory }}
+              limits:
+                cpu: {{ .Values.rotator.resources.limits.cpu }}
+                memory: {{ .Values.rotator.resources.limits.memory }}
+            securityContext:
+              capabilities:
+                drop:
+                - ALL
+              readOnlyRootFilesystem: true
+              allowPrivilegeEscalation: false
+            env:
+            - name: SECRET_NAME
+              value: "{{ .Values.webApp.session.secretName }}"
+            - name: SECRET_NAMESPACE
+              value: "{{ .Values.namespace }}"
+            - name: NUMBER_OF_KEYS
+              value: "{{ .Values.webApp.session.numberOfKeys }}"
+            - name: DRY_RUN
+              value: "false"
+{{- end }}

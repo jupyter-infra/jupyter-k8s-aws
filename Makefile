@@ -68,6 +68,7 @@ ECR_REPOSITORY_CONTROLLER := jupyter-k8s
 ECR_REPOSITORY_AWS_PLUGIN := jupyter-k8s-aws-plugin
 ECR_REPOSITORY_AUTH := jupyter-k8s-auth
 ECR_REPOSITORY_ROTATOR := jupyter-k8s-rotator
+ECR_REPOSITORY_WEB_APP := jk8s-application-web-app
 EKS_CONTEXT = arn:aws:eks:$(AWS_REGION):$(AWS_ACCOUNT_ID):cluster/$(EKS_CLUSTER_NAME)
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
@@ -289,6 +290,15 @@ deploy-aws-traefik-dex: ## Deploy aws-traefik-dex chart from .env config
 			HELM_ARGS="$$HELM_ARGS --set dex.kubernetesClientSecret=$$DEX_K8S_SECRET"; \
 		fi; \
 		\
+		if [ "$$WEB_APP_ENABLED" = "true" ]; then \
+			HELM_ARGS="$$HELM_ARGS --set webApp.enabled=true \
+				--set webApp.repository=$(ECR_REGISTRY) \
+				--set webApp.imageName=$(ECR_REPOSITORY_WEB_APP)"; \
+			if [ ! -z "$$WEB_APP_NAMESPACE" ]; then \
+				HELM_ARGS="$$HELM_ARGS --set webApp.namespace=$$WEB_APP_NAMESPACE"; \
+			fi; \
+		fi; \
+		\
 		if [ ! -z "$$KUBECTL_REDIRECT_PORTS" ]; then \
 			IFS=',' read -ra PORTS <<< "$$KUBECTL_REDIRECT_PORTS"; \
 			PORT_INDEX=0; \
@@ -298,7 +308,7 @@ deploy-aws-traefik-dex: ## Deploy aws-traefik-dex chart from .env config
 			done; \
 		fi; \
 		\
-		helm upgrade --install jk8-aws-traefik-dex /tmp/jk8s-aws-traefik-dex/aws-traefik-dex \
+		helm upgrade --install jk8-aws-traefik-dex /tmp/jk8s-aws-traefik-dex \
 			-n jupyter-k8s-router \
 			--create-namespace \
 			--force \
@@ -311,10 +321,13 @@ deploy-aws-traefik-dex: ## Deploy aws-traefik-dex chart from .env config
 			9800 \
 			dist/users-scripts/set-kubeconfig.sh \
 			"$$(kubectl get configmap dex-config -n jupyter-k8s-router -o jsonpath='{.data.config\.yaml}' | awk '/id: kubectl-oidc/{found=1} found && /secret:/{print $$2; exit}')"; \
+		echo "Restarting deployments to use new images..."; \
+		kubectl rollout restart deployment -n jupyter-k8s-router \
+			traefik oauth2-proxy dex authmiddleware; \
+		if [ "$$WEB_APP_ENABLED" = "true" ]; then \
+			kubectl rollout restart deployment -n jupyter-k8s-router web-app; \
+		fi; \
 	)
-	@echo "Restarting deployments to use new images..."
-	kubectl rollout restart deployment -n jupyter-k8s-router \
-		traefik oauth2-proxy dex authmiddleware
 	rm -rf /tmp/jk8s-aws-traefik-dex
 	@echo "Bash script for end-users to set their kubeconfig available at: dist/users-scripts"
 
