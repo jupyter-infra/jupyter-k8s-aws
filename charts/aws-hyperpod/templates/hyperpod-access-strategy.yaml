@@ -58,6 +58,13 @@ spec:
 
   {{- if .Values.clusterWebUI.enabled }}
   bearerAuthURLTemplate: "https://{{`{{ .Workspace.Name }}`}}-{{`{{ b32encode .Workspace.Namespace }}`}}.{{ .Values.clusterWebUI.domain }}/bearer-auth"
+  accessStartupProbe:
+    httpGet:
+      urlTemplate: "https://{{`{{ .Workspace.Name }}`}}-{{`{{ b32encode .Workspace.Namespace }}`}}.{{ .Values.clusterWebUI.domain }}/"
+      additionalSuccessStatusCodes: [401]
+    initialDelaySeconds: 1
+    periodSeconds: 2
+    failureThreshold: 30
   {{- end }}
 
   createConnectionHandler: "k8s-native"

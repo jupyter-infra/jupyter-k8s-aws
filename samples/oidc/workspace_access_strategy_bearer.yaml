@@ -92,3 +92,10 @@ spec:
             valueTemplate: "/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/"
   accessURLTemplate: "https://$DOMAIN/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/"
   bearerAuthURLTemplate: "https://$DOMAIN/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/bearer-auth"
+  accessStartupProbe:
+    httpGet:
+      urlTemplate: "https://$DOMAIN/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/"
+      additionalSuccessStatusCodes: [401]
+    initialDelaySeconds: 1
+    periodSeconds: 2
+    failureThreshold: 30
