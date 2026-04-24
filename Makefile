@@ -264,8 +264,7 @@ deploy-aws-traefik-dex: ## Deploy aws-traefik-dex chart from .env config
 		set -e; \
 		. ./.env; \
 		rm -rf /tmp/jk8s-aws-traefik-dex; \
-		mkdir /tmp/jk8s-aws-traefik-dex; \
-		cp -r $(CHART_TRAEFIK_DEX)/ /tmp/jk8s-aws-traefik-dex/; \
+		cp -r $(CHART_TRAEFIK_DEX) /tmp/jk8s-aws-traefik-dex; \
 		echo 'Deploying AWS traefik dex helm chart'; \
 		HELM_ARGS="--set domain=$$TRAEFIK_DEX_DOMAIN \
 			--set certManager.email=$$LETSENCRYPT_EMAIL \

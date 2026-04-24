@@ -92,3 +92,10 @@ spec:
           - name: JUPYTER_BASE_URL
             valueTemplate: "/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/"
   accessURLTemplate: "https://$DOMAIN/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/auth"
+  accessStartupProbe:
+    httpGet:
+      urlTemplate: "https://$DOMAIN/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/"
+      additionalSuccessStatusCodes: [401]
+    initialDelaySeconds: 1
+    periodSeconds: 2
+    failureThreshold: 30
