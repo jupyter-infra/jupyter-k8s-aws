@@ -20,7 +20,7 @@ endif
 
 # Image settings
 IMAGE_REGISTRY ?= public.ecr.aws/jupyter-infra
-IMAGE_NAME     ?= jk8s-aws-plugin
+IMAGE_NAME     ?= jupyter-k8s-aws-plugin
 IMAGE_TAG      ?= latest
 IMG            ?= $(IMAGE_REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
 
