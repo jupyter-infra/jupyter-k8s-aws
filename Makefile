@@ -382,11 +382,11 @@ deploy-controller: ## Deploy jupyter-k8s controller (without aws-plugin sidecar)
 	$(MAKE) -C $(CONTROLLER_DIR) load-images-aws helm-generate \
 		AWS_REGION=$(AWS_REGION) EKS_CLUSTER_NAME=$(EKS_CLUSTER_NAME)
 	@echo "Deploying jupyter-k8s controller to remote AWS cluster..."
-	helm upgrade --install jk8s $(CONTROLLER_DIR)/dist/chart \
+	helm upgrade --install jupyter-k8s $(CONTROLLER_DIR)/dist/chart \
 		--namespace jupyter-k8s-system --create-namespace \
-		--set controllerManager.container.imagePullPolicy=Always \
-		--set controllerManager.container.image.repository=$(ECR_REGISTRY)/$(ECR_REPOSITORY_CONTROLLER) \
-		--set controllerManager.container.image.tag=latest \
+		--set manager.image.pullPolicy=Always \
+		--set manager.image.repository=$(ECR_REGISTRY)/$(ECR_REPOSITORY_CONTROLLER) \
+		--set manager.image.tag=latest \
 		--set application.imagesPullPolicy=Always \
 		--set application.imagesRegistry=$(ECR_REGISTRY) \
 		--set workspacePodWatching.enable=true \
@@ -407,11 +407,11 @@ deploy-controller-with-plugin: ecr-push ## Deploy jupyter-k8s controller with aw
 	$(MAKE) -C $(CONTROLLER_DIR) load-images-aws helm-generate \
 		AWS_REGION=$(AWS_REGION) EKS_CLUSTER_NAME=$(EKS_CLUSTER_NAME)
 	@echo "Deploying jupyter-k8s controller with aws-plugin sidecar..."
-	helm upgrade --install jk8s $(CONTROLLER_DIR)/dist/chart \
+	helm upgrade --install jupyter-k8s $(CONTROLLER_DIR)/dist/chart \
 		--namespace jupyter-k8s-system --create-namespace \
-		--set controllerManager.container.imagePullPolicy=Always \
-		--set controllerManager.container.image.repository=$(ECR_REGISTRY)/$(ECR_REPOSITORY_CONTROLLER) \
-		--set controllerManager.container.image.tag=latest \
+		--set manager.image.pullPolicy=Always \
+		--set manager.image.repository=$(ECR_REGISTRY)/$(ECR_REPOSITORY_CONTROLLER) \
+		--set manager.image.tag=latest \
 		--set application.imagesPullPolicy=Always \
 		--set application.imagesRegistry=$(ECR_REGISTRY) \
 		--set workspacePodWatching.enable=true \
