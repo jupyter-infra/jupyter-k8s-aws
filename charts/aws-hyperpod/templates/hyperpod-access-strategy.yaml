@@ -156,5 +156,7 @@ spec:
             valueTemplate: "{{`{{ .Workspace.Spec.AccessType }}`}}"
           - name: WORKSPACE_APP_TYPE
             valueTemplate: "{{`{{ .Workspace.Spec.AppType }}`}}"
+          - name: WORKSPACE_CREATOR_USERNAME
+            valueTemplate: "{{`{{ index .Workspace.Annotations \"workspace.jupyter.org/created-by\" }}`}}"
           - name: JUPYTER_BASE_URL
             valueTemplate: "/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/"
