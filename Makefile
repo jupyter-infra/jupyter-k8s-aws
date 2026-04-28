@@ -253,7 +253,7 @@ kubectl-aws: ## Configure kubectl to use remote cluster
 	fi
 
 .PHONY: deploy-aws-traefik-dex
-deploy-aws-traefik-dex: ## Deploy aws-traefik-dex chart from .env config
+deploy-aws-traefik-dex: setup-aws ## Deploy aws-traefik-dex chart from .env config
 	@if [ ! -f .env ]; then \
 		echo ".env file not found. Copy .env.example to .env and edit the values."; \
 		echo "Required: TRAEFIK_DEX_DOMAIN, LETSENCRYPT_EMAIL, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_ORG_NAME"; \
@@ -331,7 +331,7 @@ deploy-aws-traefik-dex: ## Deploy aws-traefik-dex chart from .env config
 	@echo "Bash script for end-users to set their kubeconfig available at: dist/users-scripts"
 
 .PHONY: deploy-aws-hyperpod
-deploy-aws-hyperpod: ## Deploy aws-hyperpod chart from .env config
+deploy-aws-hyperpod: setup-aws ## Deploy aws-hyperpod chart from .env config
 	@if [ ! -f .env ]; then \
 		echo ".env file not found. Copy .env.example to .env and edit the values."; \
 		echo "Required: HYPERPOD_DOMAIN, ACM_CERT_ARN"; \
@@ -374,7 +374,7 @@ deploy-aws-hyperpod: ## Deploy aws-hyperpod chart from .env config
 	-kubectl rollout restart deployment -n jupyter-k8s-system workspace-auth-middleware 2>/dev/null || true
 
 .PHONY: deploy-controller
-deploy-controller: ## Deploy jupyter-k8s controller (without aws-plugin sidecar)
+deploy-controller: setup-aws ## Deploy jupyter-k8s controller (without aws-plugin sidecar)
 	@if [ ! -d "$(CONTROLLER_DIR)" ]; then \
 		echo "jupyter-k8s repo not found at $(CONTROLLER_DIR). Set CONTROLLER_DIR to the correct path."; \
 		exit 1; \
@@ -399,7 +399,7 @@ deploy-controller: ## Deploy jupyter-k8s controller (without aws-plugin sidecar)
 	@echo "Controller deployed successfully."
 
 .PHONY: deploy-controller-with-plugin
-deploy-controller-with-plugin: ecr-push ## Deploy jupyter-k8s controller with aws-plugin sidecar
+deploy-controller-with-plugin: setup-aws ecr-push ## Deploy jupyter-k8s controller with aws-plugin sidecar
 	@if [ ! -d "$(CONTROLLER_DIR)" ]; then \
 		echo "jupyter-k8s repo not found at $(CONTROLLER_DIR). Set CONTROLLER_DIR to the correct path."; \
 		exit 1; \
