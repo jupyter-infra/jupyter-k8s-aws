@@ -1,0 +1,44 @@
+name: "Release: Promote Chart"
+
+on:
+  workflow_call:
+    inputs:
+      chart_name:
+        required: true
+        type: string
+      chart_version:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      chart_name:
+        description: 'Chart name (e.g. jupyter-k8s-aws-oidc)'
+        required: true
+      chart_version:
+        description: 'Chart version to promote (e.g. 0.1.0)'
+        required: true
+
+env:
+  STAGING_REGISTRY: ghcr.io/jupyter-infra/staging
+  PROD_REGISTRY: ghcr.io/jupyter-infra
+
+jobs:
+  promote:
+    name: Promote chart
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Login Helm to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Pull from staging and push to production
+        run: |
+          helm pull oci://${{ env.STAGING_REGISTRY }}/charts/${{ inputs.chart_name }} \
+            --version ${{ inputs.chart_version }}
+          helm push ${{ inputs.chart_name }}-${{ inputs.chart_version }}.tgz \
+            oci://${{ env.PROD_REGISTRY }}/charts/

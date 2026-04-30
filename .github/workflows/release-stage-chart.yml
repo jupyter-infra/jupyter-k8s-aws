@@ -1,0 +1,80 @@
+name: "Release: Stage Chart"
+
+on:
+  workflow_call:
+    inputs:
+      chart_name:
+        required: true
+        type: string
+      chart_dir:
+        required: true
+        type: string
+      chart_version:
+        required: true
+        type: string
+      app_version:
+        required: true
+        type: string
+    outputs:
+      chart_version:
+        value: ${{ jobs.package-and-push.outputs.chart_version }}
+  workflow_dispatch:
+    inputs:
+      chart_name:
+        description: 'Chart name (e.g. jupyter-k8s-aws-oidc)'
+        required: true
+      chart_dir:
+        description: 'Chart directory (e.g. charts/aws-oidc)'
+        required: true
+      chart_version:
+        description: 'Chart version without v prefix (e.g. 0.1.0)'
+        required: true
+      app_version:
+        description: 'App version (e.g. 0.1.0)'
+        required: true
+
+env:
+  STAGING_REGISTRY: ghcr.io/jupyter-infra/staging
+
+jobs:
+  package-and-push:
+    name: Package and push chart
+    runs-on: ubuntu-latest
+    outputs:
+      chart_version: ${{ inputs.chart_version }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Add Helm repos
+        run: |
+          helm repo add traefik https://traefik.github.io/charts
+          helm repo update
+
+      - name: Build dependencies
+        run: helm dependency build ${{ inputs.chart_dir }}
+
+      - name: Patch chart version
+        run: |
+          sed -i "s/^version: .*/version: ${{ inputs.chart_version }}/" ${{ inputs.chart_dir }}/Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: \"${{ inputs.app_version }}\"/" ${{ inputs.chart_dir }}/Chart.yaml
+          echo "## Chart.yaml" >> "$GITHUB_STEP_SUMMARY"
+          cat ${{ inputs.chart_dir }}/Chart.yaml >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Lint chart
+        run: helm lint ${{ inputs.chart_dir }}
+
+      - name: Package chart
+        run: helm package ${{ inputs.chart_dir }} -d dist/
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push chart to staging
+        run: helm push dist/${{ inputs.chart_name }}-${{ inputs.chart_version }}.tgz oci://${{ env.STAGING_REGISTRY }}/charts/

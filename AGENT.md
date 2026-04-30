@@ -163,6 +163,11 @@ Sample workspace manifests for testing against a deployed cluster.
 - `make helm-lint`
 - `make helm-test`
 
+## CI & Release
+
+See [`.github/AGENT.md`](.github/AGENT.md) for workflow details, release flow, and how to
+test workflow changes from feature branches.
+
 ## Notes
 
 - Default container runtime is Finch (configurable via `CONTAINER_TOOL` in Makefile)
