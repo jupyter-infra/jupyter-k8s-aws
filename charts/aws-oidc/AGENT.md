@@ -1,4 +1,4 @@
-# Testing: aws-traefik-dex Guided Chart
+# Testing: aws-oidc Guided Chart
 
 This chart deploys the OSS routing stack: Traefik reverse proxy, Dex OIDC provider with GitHub OAuth,
 OAuth2-proxy, authmiddleware, and JWT key rotation. It does NOT use `--plugin-endpoints` — there are
@@ -28,7 +28,7 @@ If there's an existing deployment, tear it down in dependency order:
 
 ```bash
 kubectl delete workspaces --all --all-namespaces --wait
-helm uninstall aws-traefik-dex -n jupyter-k8s-system 2>/dev/null; true
+helm uninstall aws-oidc -n jupyter-k8s-system 2>/dev/null; true
 helm uninstall jk8s -n jupyter-k8s-system
 kubectl delete crd workspaces.workspace.jupyter.org \
   workspaceaccessstrategies.workspace.jupyter.org \
@@ -49,7 +49,7 @@ The OSS chart is deployed without plugins:
 
 ```bash
 make deploy-aws                       # operator chart WITHOUT PLUGINS=aws
-make deploy-aws-traefik-dex           # OSS guided chart (reads .env for domain, GitHub, EFS)
+make deploy-aws-oidc                  # OSS guided chart (reads .env for domain, GitHub, EFS)
 ```
 
 **Checks:**

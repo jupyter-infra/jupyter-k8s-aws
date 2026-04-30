@@ -1,4 +1,4 @@
-# [AWS TRAEFIK DEX]: Configuration for aws-traefik-dex deployment mode
+# [AWS OIDC]: Configuration for aws-oidc deployment mode
 {{- if (.Capabilities.APIVersions.Has "helm.toolkit.fluxcd.io/v2beta1") }}
 {{- fail "This chart is not compatible with Flux CD. Please use a different deployment method." }}
 {{- end }}

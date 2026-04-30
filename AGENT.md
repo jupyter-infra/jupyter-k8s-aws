@@ -8,7 +8,7 @@
 AWS-specific plugin sidecar and Helm charts for
 [jupyter-k8s](https://github.com/jupyter-infra/jupyter-k8s) deployments.
 Provides the SSM-based remote access sidecar (`aws-plugin`) and two
-deployment charts (`aws-hyperpod`, `aws-traefik-dex`).
+deployment charts (`aws-hyperpod`, `aws-oidc`).
 
 Module path: `github.com/jupyter-infra/jupyter-k8s-aws`
 
@@ -36,7 +36,7 @@ This chart relies on bearer-token access, and requires the awsplugin to run as s
 - Rotator and Kubernetes secret for Authmiddleware JWT seed
 Configures a workspace AccessStrategy for both remote access and WebUI, and related templates.
 
-**`aws-traefik-dex`**:
+**`aws-oidc`**:
 This chart relies on GitHub OIDC to control Workspace access, and DOES NOT need the awsplugin to run as a sidecar of the controller. It deploys:
 - Traefik as router (TLS termination in traefik pod with LetsEncrypt TLS certificates)
 - Dex as OIDC identity provider for GitHub OAuth authentication
@@ -65,7 +65,7 @@ delegate to the sibling jupyter-k8s checkout to deploy the controller.
 | `cmd/aws-plugin/`         | SSM sidecar binary entry point                                   |
 | `internal/awsplugin/`     | AWS SDK handlers (SSM client, remote access routes, initializer) |
 | `charts/aws-hyperpod/`    | Helm chart: plugin + SSM + web UI for SageMaker HyperPod        |
-| `charts/aws-traefik-dex/` | Helm chart: Traefik + Dex OAuth (no Go, Helm only)               |
+| `charts/aws-oidc/`        | Helm chart: Traefik + Dex OAuth (no Go, Helm only)               |
 | `Dockerfile`              | Container image for the aws-plugin sidecar                       |
 | `samples/hyperpod/`       | Sample HyperPod workspaces (JupyterLab, Code Editor)             |
 | `samples/oidc/`           | Sample OIDC workspaces with access strategies (OAuth, bearer)    |
@@ -102,13 +102,13 @@ Controller deployment targets delegate to that repo via `CONTROLLER_DIR` (defaul
 
 **Guided charts (this repo):**
 - Setup EKS connection: `make setup-aws`
-- Deploy traefik-dex: `make deploy-aws-traefik-dex`
+- Deploy aws-oidc: `make deploy-aws-oidc`
 - Deploy hyperpod: `make deploy-aws-hyperpod`
 - Undeploy all: `make undeploy-aws`
 
 The two guided charts cannot be deployed on the same cluster.
-- `aws-traefik-dex` uses OIDC (GitHub OAuth) for access — does NOT need the aws-plugin sidecar.
-  Use `make deploy-controller` + `make deploy-aws-traefik-dex`.
+- `aws-oidc` uses OIDC (GitHub OAuth) for access — does NOT need the aws-plugin sidecar.
+  Use `make deploy-controller` + `make deploy-aws-oidc`.
 - `aws-hyperpod` uses bearer-token access — requires the aws-plugin sidecar.
   Use `make deploy-controller-with-plugin` + `make deploy-aws-hyperpod`.
 
@@ -118,11 +118,11 @@ Deployment targets read configuration from `.env` (copy `.env.example` to get st
 
 There is no local Kind cluster support — an AWS EKS cluster is required.
 
-**For `aws-traefik-dex` (OIDC):**
+**For `aws-oidc` (OIDC):**
 1. Configure `.env` with `AWS_REGION`, `EKS_CLUSTER_NAME`, and OIDC variables
 2. `make setup-aws`
 3. `make deploy-controller`
-4. `make deploy-aws-traefik-dex`
+4. `make deploy-aws-oidc`
 5. `make apply-sample-oidc`
 6. Verify workspaces: `kubectl get workspaces`
 7. Open the access URL in a browser and complete the GitHub OAuth flow
@@ -142,8 +142,8 @@ There is no local Kind cluster support — an AWS EKS cluster is required.
 
 Sample workspace manifests for testing against a deployed cluster.
 
-**OIDC workspaces** (requires `aws-traefik-dex` chart deployed):
-- Apply: `make apply-sample-oidc` (reads `TRAEFIK_DEX_DOMAIN` or `HYPERPOD_DOMAIN` from `.env`)
+**OIDC workspaces** (requires `aws-oidc` chart deployed):
+- Apply: `make apply-sample-oidc` (reads `OIDC_DOMAIN` or `HYPERPOD_DOMAIN` from `.env`)
 - Delete: `make delete-sample-oidc`
 - Creates workspaces with OAuth and bearer-token access strategies (public + private variants)
 
