@@ -5,7 +5,7 @@ kind: StorageClass
 metadata:
   name: {{ .Values.storageClass.efs.name }}
   labels:
-    app.kubernetes.io/name: jupyter-k8s-aws-traefik-dex
+    app.kubernetes.io/name: jupyter-k8s-aws-oidc
 provisioner: {{ .Values.storageClass.efs.provisioner }}
 parameters:
   {{- toYaml .Values.storageClass.efs.parameters | nindent 2 }}

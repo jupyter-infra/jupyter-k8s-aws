@@ -3,7 +3,7 @@ Copyright (c) Amazon Web Services
 Distributed under the terms of the MIT license
 */
 
-package aws_traefik_dex_test
+package aws_oidc_test
 
 import (
 	"path/filepath"
@@ -13,14 +13,14 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("AWS-Traefik-Dex Values Consistency", func() {
-	It("should have consistent references between aws-traefik-dex templates and values.yaml", func() {
+var _ = Describe("AWS-OIDC Values Consistency", func() {
+	It("should have consistent references between aws-oidc templates and values.yaml", func() {
 		rootDir, err := filepath.Abs("../../..")
 		Expect(err).NotTo(HaveOccurred())
 
 		// Use the chart's values file
-		valuesPath := filepath.Join(rootDir, "charts/aws-traefik-dex/values.yaml")
-		templatesDir := filepath.Join(rootDir, "charts/aws-traefik-dex/templates")
+		valuesPath := filepath.Join(rootDir, "charts/aws-oidc/values.yaml")
+		templatesDir := filepath.Join(rootDir, "charts/aws-oidc/templates")
 
 		// Extract schema from values.yaml
 		schema, err := helm.ExtractValuesSchema(valuesPath)
