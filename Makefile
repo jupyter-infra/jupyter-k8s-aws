@@ -27,7 +27,7 @@ IMG            ?= $(IMAGE_REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
 # Helm chart paths
 CHARTS_DIR        := charts
 CHART_HYPERPOD    := $(CHARTS_DIR)/aws-hyperpod
-CHART_TRAEFIK_DEX := $(CHARTS_DIR)/aws-traefik-dex
+CHART_OIDC        := $(CHARTS_DIR)/aws-oidc
 
 # Path to sibling jupyter-k8s checkout (for controller chart deployment)
 CONTROLLER_DIR ?= ../jupyter-k8s
@@ -37,7 +37,7 @@ OAUTH2P_COOKIE_SECRET := $(shell openssl rand -base64 32 | tr -- '+/' '-_')
 
 # AWS configuration
 # Resolution order (highest priority first):
-#   1. Command line: make deploy-aws-traefik-dex AWS_REGION=us-east-2
+#   1. Command line: make deploy-aws-oidc AWS_REGION=us-east-2
 #   2. .env file: AWS_REGION=us-east-2
 #   3. Defaults: us-west-2 / jupyter-k8s-cluster
 ifneq (,$(wildcard .env))
@@ -116,7 +116,7 @@ deps: ## Download and tidy Go dependencies
 
 .PHONY: helm-lint
 helm-lint: ## Lint all Helm charts
-	helm lint $(CHART_TRAEFIK_DEX) \
+	helm lint $(CHART_OIDC) \
 		--set domain=a.fine.example.com \
 		--set certManager.email=admin@example.com \
 		--set storageClass.efs.parameters.fileSystemId=fs-00001111222233334 \
@@ -138,13 +138,13 @@ helm-lint: ## Lint all Helm charts
 		--set remoteAccess.ssmSidecarImage.repository=ssm-sidecar \
 		--set remoteAccess.ssmSidecarImage.tag=latest
 
-.PHONY: helm-test-aws-traefik-dex
-helm-test-aws-traefik-dex: ## Render and test aws-traefik-dex chart
-	rm -rf dist/test-output/aws-traefik-dex
+.PHONY: helm-test-aws-oidc
+helm-test-aws-oidc: ## Render and test aws-oidc chart
+	rm -rf dist/test-output/aws-oidc
 	rm -rf /tmp/helm-test-chart
-	cp -r $(CHART_TRAEFIK_DEX) /tmp/helm-test-chart
+	cp -r $(CHART_OIDC) /tmp/helm-test-chart
 	cd /tmp/helm-test-chart && helm dependency build
-	helm template jk8s /tmp/helm-test-chart --output-dir dist/test-output/aws-traefik-dex \
+	helm template jk8s /tmp/helm-test-chart --output-dir dist/test-output/aws-oidc \
 		--set domain=a.fine.example.com \
 		--set certManager.email=admin@example.com \
 		--set storageClass.efs.parameters.fileSystemId=fs-00001111222233334 \
@@ -157,7 +157,7 @@ helm-test-aws-traefik-dex: ## Render and test aws-traefik-dex chart
 		--set oauth2Proxy.cookieSecret=$(OAUTH2P_COOKIE_SECRET) \
 		--set authmiddleware.enableBearerAuth=true
 	rm -rf /tmp/helm-test-chart
-	go test ./test/helm/aws-traefik-dex -v
+	go test ./test/helm/aws-oidc -v
 
 .PHONY: helm-test-aws-hyperpod
 helm-test-aws-hyperpod: ## Render and test aws-hyperpod chart
@@ -180,7 +180,7 @@ helm-test-aws-hyperpod: ## Render and test aws-hyperpod chart
 	go test ./test/helm/aws-hyperpod -v
 
 .PHONY: helm-test
-helm-test: helm-test-aws-traefik-dex helm-test-aws-hyperpod ## Run all Helm tests
+helm-test: helm-test-aws-oidc helm-test-aws-hyperpod ## Run all Helm tests
 
 ##@ Images
 
@@ -252,21 +252,21 @@ kubectl-aws: ## Configure kubectl to use remote cluster
 		exit 1; \
 	fi
 
-.PHONY: deploy-aws-traefik-dex
-deploy-aws-traefik-dex: setup-aws ## Deploy aws-traefik-dex chart from .env config
+.PHONY: deploy-aws-oidc
+deploy-aws-oidc: setup-aws ## Deploy aws-oidc chart from .env config
 	@if [ ! -f .env ]; then \
 		echo ".env file not found. Copy .env.example to .env and edit the values."; \
-		echo "Required: TRAEFIK_DEX_DOMAIN, LETSENCRYPT_EMAIL, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_ORG_NAME"; \
+		echo "Required: OIDC_DOMAIN, LETSENCRYPT_EMAIL, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_ORG_NAME"; \
 		exit 1; \
 	fi
 	@echo "Loading configuration from .env file and deploying..."
 	@( \
 		set -e; \
 		. ./.env; \
-		rm -rf /tmp/jk8s-aws-traefik-dex; \
-		cp -r $(CHART_TRAEFIK_DEX) /tmp/jk8s-aws-traefik-dex; \
-		echo 'Deploying AWS traefik dex helm chart'; \
-		HELM_ARGS="--set domain=$$TRAEFIK_DEX_DOMAIN \
+		rm -rf /tmp/jk8s-aws-oidc; \
+		cp -r $(CHART_OIDC) /tmp/jk8s-aws-oidc; \
+		echo 'Deploying AWS OIDC helm chart'; \
+		HELM_ARGS="--set domain=$$OIDC_DOMAIN \
 			--set certManager.email=$$LETSENCRYPT_EMAIL \
 			--set storageClass.efs.parameters.fileSystemId=$$EFS_ID \
 			--set github.clientId=$$GITHUB_CLIENT_ID \
@@ -307,15 +307,15 @@ deploy-aws-traefik-dex: setup-aws ## Deploy aws-traefik-dex chart from .env conf
 			done; \
 		fi; \
 		\
-		helm upgrade --install jk8-aws-traefik-dex /tmp/jk8s-aws-traefik-dex \
+		helm upgrade --install jk8-aws-oidc /tmp/jk8s-aws-oidc \
 			-n jupyter-k8s-router \
 			--create-namespace \
 			--force \
 			$$HELM_ARGS; \
 		\
-		$(SHELL) scripts/aws-traefik-dex/generate-client.sh \
+		$(SHELL) scripts/aws-oidc/generate-client.sh \
 			$(EKS_CLUSTER_NAME) \
-			https://$$TRAEFIK_DEX_DOMAIN/dex \
+			https://$$OIDC_DOMAIN/dex \
 			$(AWS_REGION) \
 			9800 \
 			dist/users-scripts/set-kubeconfig.sh \
@@ -327,7 +327,7 @@ deploy-aws-traefik-dex: setup-aws ## Deploy aws-traefik-dex chart from .env conf
 			kubectl rollout restart deployment -n jupyter-k8s-router web-app; \
 		fi; \
 	)
-	rm -rf /tmp/jk8s-aws-traefik-dex
+	rm -rf /tmp/jk8s-aws-oidc
 	@echo "Bash script for end-users to set their kubeconfig available at: dist/users-scripts"
 
 .PHONY: deploy-aws-hyperpod
@@ -446,7 +446,7 @@ undeploy-aws-hyperpod: ## Remove aws-hyperpod chart
 .PHONY: undeploy-aws
 undeploy-aws: ## Uninstall all Helm charts from remote cluster
 	@echo "Undeploying Helm charts from remote AWS cluster..."
-	helm uninstall jk8-aws-traefik-dex -n jupyter-k8s-router --ignore-not-found
+	helm uninstall jk8-aws-oidc -n jupyter-k8s-router --ignore-not-found
 	helm uninstall aws-hyperpod -n jupyter-k8s-system --ignore-not-found
 	helm uninstall traefik-crd --ignore-not-found
 
@@ -459,7 +459,7 @@ apply-sample-oidc: ## Create sample OIDC workspaces with access strategies
 	@( \
 		set -e; \
 		. ./.env; \
-		export DOMAIN=$${TRAEFIK_DEX_DOMAIN:-$$HYPERPOD_DOMAIN}; \
+		export DOMAIN=$${OIDC_DOMAIN:-$$HYPERPOD_DOMAIN}; \
 		kubectl apply -f samples/oidc/workspace_access_strategy.yaml --dry-run=client -o yaml | envsubst | kubectl apply -f -; \
 		kubectl apply -f samples/oidc/workspace_access_strategy_bearer.yaml --dry-run=client -o yaml | envsubst | kubectl apply -f -; \
 		kubectl apply -k samples/oidc --dry-run=client -o yaml | envsubst | kubectl apply -f -; \

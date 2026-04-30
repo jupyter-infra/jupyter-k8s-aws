@@ -1,4 +1,4 @@
-# [AWS TRAEFIK DEX]: Configuration for aws-traefik-dex deployment mode
+# [AWS OIDC]: Configuration for aws-oidc deployment mode
 
 # Default namespace for Traefik Middlewares and other resources
 # This should be left as the default for normal operation

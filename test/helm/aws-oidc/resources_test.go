@@ -3,7 +3,7 @@ Copyright (c) Amazon Web Services
 Distributed under the terms of the MIT license
 */
 
-package aws_traefik_dex_test
+package aws_oidc_test
 
 import (
 	"os"
@@ -20,21 +20,21 @@ import (
 )
 
 // Test suite for verifying Helm chart resources match config resources
-var _ = Describe("AWS Traefik Dex Resources", func() {
-	It("should include all aws-traefik-dex resources in the Helm chart", func() {
+var _ = Describe("AWS OIDC Resources", func() {
+	It("should include all aws-oidc resources in the Helm chart", func() {
 		// Get project root directory
 		rootDir, err := filepath.Abs("../../..")
 		Expect(err).NotTo(HaveOccurred())
 
 		// Parse resources from source directory
-		configDir := filepath.Join(rootDir, "charts", "aws-traefik-dex", "templates")
+		configDir := filepath.Join(rootDir, "charts", "aws-oidc", "templates")
 		configResources, configMap, err := helm.ParseYAMLDirectory(configDir)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(configResources).NotTo(BeEmpty(), "No resources found in charts directory")
 
 		// Parse resources from target directory
 		helmDir := filepath.Join(
-			rootDir, "dist", "test-output", "aws-traefik-dex", "jupyter-k8s-aws-traefik-dex", "templates")
+			rootDir, "dist", "test-output", "aws-oidc", "jupyter-k8s-aws-oidc", "templates")
 		helmResources, helmMap, err := helm.ParseYAMLDirectory(helmDir)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(helmResources).NotTo(BeEmpty(), "No resources found in output directory")
@@ -74,8 +74,8 @@ var _ = Describe("AWS Traefik Dex Resources", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// Check that values references are valid
-		templatesDir := filepath.Join(rootDir, "charts", "aws-traefik-dex", "templates")
-		valuesPath := filepath.Join(rootDir, "charts", "aws-traefik-dex", "values.yaml")
+		templatesDir := filepath.Join(rootDir, "charts", "aws-oidc", "templates")
+		valuesPath := filepath.Join(rootDir, "charts", "aws-oidc", "values.yaml")
 
 		// Extract references from templates
 		references, err := helm.ExtractTemplateReferences(templatesDir)
@@ -98,7 +98,7 @@ var _ = Describe("AWS Traefik Dex Resources", func() {
 
 		// Read the rendered secret
 		secretPath := filepath.Join(
-			rootDir, "dist", "test-output", "aws-traefik-dex", "jupyter-k8s-aws-traefik-dex",
+			rootDir, "dist", "test-output", "aws-oidc", "jupyter-k8s-aws-oidc",
 			"templates", "authmiddleware", "secrets.yaml")
 
 		secretBytes, err := os.ReadFile(secretPath)
@@ -135,7 +135,7 @@ var _ = Describe("AWS Traefik Dex Resources", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		rbacPath := filepath.Join(
-			rootDir, "dist", "test-output", "aws-traefik-dex", "jupyter-k8s-aws-traefik-dex",
+			rootDir, "dist", "test-output", "aws-oidc", "jupyter-k8s-aws-oidc",
 			"templates", "authmiddleware", "rbac.yaml")
 
 		rbacBytes, err := os.ReadFile(rbacPath)

@@ -3,7 +3,7 @@ Copyright (c) Amazon Web Services
 Distributed under the terms of the MIT license
 */
 
-package aws_traefik_dex_test
+package aws_oidc_test
 
 import (
 	"fmt"
@@ -47,7 +47,7 @@ var _ = Describe("OIDC Configuration Consistency", func() {
 
 		// Path to rendered test output
 		testOutputDir = filepath.Join(
-			rootDir, "dist/test-output/aws-traefik-dex/jupyter-k8s-aws-traefik-dex/templates")
+			rootDir, "dist/test-output/aws-oidc/jupyter-k8s-aws-oidc/templates")
 
 		// Read the necessary files
 		dexConfigmapPath := filepath.Join(testOutputDir, "dex/configmap.yaml")
