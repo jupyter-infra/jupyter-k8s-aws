@@ -64,7 +64,7 @@ spec:
       additionalSuccessStatusCodes: [401]
     initialDelaySeconds: 1
     periodSeconds: 2
-    failureThreshold: 30
+    failureThreshold: 20
   {{- end }}
 
   createConnectionHandler: "k8s-native"
