@@ -5,7 +5,7 @@ kind: StorageClass
 metadata:
   name: {{ .Values.storageClass.ebs.name }}
   labels:
-    app.kubernetes.io/name: jupyter-k8s-aws-traefik-dex
+    app.kubernetes.io/name: jupyter-k8s-aws-oidc
   {{- if .Values.storageClass.ebs.isDefault }}
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"

@@ -3,7 +3,7 @@ Copyright (c) Amazon Web Services
 Distributed under the terms of the MIT license
 */
 
-package aws_traefik_dex_test
+package aws_oidc_test
 
 import (
 	"testing"
@@ -12,7 +12,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestAwsTraefikDex(t *testing.T) {
+func TestAwsOidc(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "AWS Traefik Dex Suite")
+	RunSpecs(t, "AWS OIDC Suite")
 }

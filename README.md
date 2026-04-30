@@ -9,7 +9,7 @@ AWS-specific plugin sidecar and Helm charts for
 |-----------|-------------|
 | **aws-plugin** | SSM-based remote access sidecar, deployed alongside the jupyter-k8s controller |
 | **aws-hyperpod** | Helm chart: plugin + SSM remote access + web UI for SageMaker HyperPod |
-| **aws-traefik-dex** | Helm chart: Traefik reverse proxy + Dex OIDC + OAuth2-Proxy (no Go code) |
+| **aws-oidc** | Helm chart: Traefik reverse proxy + Dex OIDC + OAuth2-Proxy (no Go code) |
 
 ## Architecture
 
@@ -24,7 +24,7 @@ There is no direct dependency between the operator and this repository.
 ## Installation
 
 See [charts/aws-hyperpod/](charts/aws-hyperpod/) or
-[charts/aws-traefik-dex/](charts/aws-traefik-dex/) for chart-specific instructions.
+[charts/aws-oidc/](charts/aws-oidc/) for chart-specific instructions.
 
 ## Contributing
 
