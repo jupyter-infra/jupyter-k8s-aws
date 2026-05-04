@@ -19,6 +19,14 @@ spec:
         component: auth
     spec:
       serviceAccountName: oauth2-proxy
+      {{- with .Values.oauth2Proxy.nodeSelector | default .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.oauth2Proxy.tolerations | default .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       initContainers:
       - name: wait-for-dex
         image: busybox:latest

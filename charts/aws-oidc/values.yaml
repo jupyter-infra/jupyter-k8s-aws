@@ -1,5 +1,10 @@
 # [AWS OIDC]: Configuration for aws-oidc deployment mode
 
+# Node selector labels applied to all chart component pods (default: no constraint)
+nodeSelector: {}
+# Tolerations applied to all chart component pods (default: none)
+tolerations: []
+
 # Default namespace for Traefik Middlewares and other resources
 # This should be left as the default for normal operation
 namespace: jupyter-k8s-router
@@ -63,6 +68,10 @@ traefik:
   debug: true
   # Allow cross-namespace middleware references
   allowCrossNamespace: true
+  # Node selector for traefik pods (overrides chart-level nodeSelector)
+  nodeSelector: {}
+  # Tolerations for traefik pods (overrides chart-level tolerations)
+  tolerations: []
 
 # Dex configuration
 dex:
@@ -73,6 +82,10 @@ dex:
     # Maximum time to wait for traefik availability
     timeout_seconds: 60
 
+  # Node selector for dex pods (overrides chart-level nodeSelector)
+  nodeSelector: {}
+  # Tolerations for dex pods (overrides chart-level tolerations)
+  tolerations: []
   # Prefix for the username k8s identity authenticated through Dex
   oidcUsernamePrefix: "github:"
   # Prefix for the k8s groups authenticated through Dex
@@ -130,6 +143,10 @@ githubRbac:
 
 # OAuth2 Proxy configuration
 oauth2Proxy:
+  # Node selector for oauth2-proxy pods (overrides chart-level nodeSelector)
+  nodeSelector: {}
+  # Tolerations for oauth2-proxy pods (overrides chart-level tolerations)
+  tolerations: []
   # Cookie secret for OAuth2 Proxy (generate with openssl rand -base64 32 | tr -- '+/' '-_')
   cookieSecret: ""
   # Cookie expiry duration (Go duration string, e.g. "8h", "1h30m")
@@ -162,6 +179,10 @@ oauth2Proxy:
 #   - No web interface is available
 # ============================================================================
 webApp:
+  # Node selector for web-app pods (overrides chart-level nodeSelector)
+  nodeSelector: {}
+  # Tolerations for web-app pods (overrides chart-level tolerations)
+  tolerations: []
   # Enable or disable the web UI (default: false)
   enabled: false
   replicas: 2
@@ -190,6 +211,10 @@ webApp:
 
 # Authmiddleware configuration
 authmiddleware:
+  # Node selector for authmiddleware pods (overrides chart-level nodeSelector)
+  nodeSelector: {}
+  # Tolerations for authmiddleware pods (overrides chart-level tolerations)
+  tolerations: []
   # Whether to deploy the authmiddleware component
   enabled: true
   # Number of replicas
@@ -240,6 +265,10 @@ authmiddleware:
 
 # JWT Secret Rotator configuration
 rotator:
+  # Node selector for rotator pods (overrides chart-level nodeSelector)
+  nodeSelector: {}
+  # Tolerations for rotator pods (overrides chart-level tolerations)
+  tolerations: []
   # Whether to enable automatic JWT secret rotation
   enabled: true
   # Rotator image settings
