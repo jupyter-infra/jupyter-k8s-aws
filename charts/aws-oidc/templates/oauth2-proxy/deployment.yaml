@@ -29,7 +29,7 @@ spec:
       {{- end }}
       initContainers:
       - name: wait-for-dex
-        image: busybox:latest
+        image: {{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}
         imagePullPolicy: IfNotPresent
         command:
         - sh
@@ -51,7 +51,7 @@ spec:
           echo "Dex service is available or timeout reached!"
       containers:
       - name: oauth2-proxy
-        image: quay.io/oauth2-proxy/oauth2-proxy:latest
+        image: {{ .Values.oauth2Proxy.repository }}:{{ .Values.oauth2Proxy.imageTag }}
         args:
         - --provider=oidc
         - --provider-display-name=GitHub

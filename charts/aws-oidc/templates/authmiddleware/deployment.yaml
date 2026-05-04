@@ -37,7 +37,7 @@ spec:
       {{- end }}
       initContainers:
       - name: wait-for-dex
-        image: busybox:latest
+        image: {{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}
         imagePullPolicy: IfNotPresent
         command:
         - sh
