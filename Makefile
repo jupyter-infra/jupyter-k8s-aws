@@ -278,9 +278,11 @@ deploy-aws-oidc: setup-aws ## Deploy aws-oidc chart from .env config
 			--set oauth2Proxy.cookieSecret=$(OAUTH2P_COOKIE_SECRET) \
 			--set authmiddleware.repository=$(ECR_REGISTRY) \
 			--set authmiddleware.imageName=$(ECR_REPOSITORY_AUTH) \
+			--set authmiddleware.imageTag=latest \
 			--set authmiddleware.enableBearerAuth=true \
 			--set rotator.repository=$(ECR_REGISTRY) \
-			--set rotator.imageName=$(ECR_REPOSITORY_ROTATOR)"; \
+			--set rotator.imageName=$(ECR_REPOSITORY_ROTATOR) \
+			--set rotator.imageTag=latest"; \
 		if [ ! -z "$$DEX_OAUTH2_SECRET" ]; then \
 			HELM_ARGS="$$HELM_ARGS --set dex.oauth2ProxyClientSecret=$$DEX_OAUTH2_SECRET"; \
 		fi; \
