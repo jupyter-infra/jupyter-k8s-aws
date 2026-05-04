@@ -5,6 +5,11 @@ nodeSelector: {}
 # Tolerations applied to all chart component pods (default: none)
 tolerations: []
 
+# Init container image used for readiness checks
+initImage:
+  repository: docker.io/busybox
+  tag: "1.37"
+
 # Default namespace for Traefik Middlewares and other resources
 # This should be left as the default for normal operation
 namespace: jupyter-k8s-router
@@ -59,7 +64,7 @@ traefik:
   # Traefik deployment image name
   imageName: traefik
   # Traefik deployment image tag
-  imageTag: latest
+  imageTag: v3.6
   # Number of traefik replicas
   replicas: 1
   # Redirect HTTP to HTTPS
@@ -75,8 +80,11 @@ traefik:
 
 # Dex configuration
 dex:
-  # Number of traefik replicas
+  # Number of dex replicas
   replicas: 1
+  # Dex image settings
+  repository: ghcr.io/dexidp/dex
+  imageTag: v2.45.1
   # initContainer config for traefik availability checks
   traefikCheck:
     # Maximum time to wait for traefik availability
@@ -143,6 +151,9 @@ githubRbac:
 
 # OAuth2 Proxy configuration
 oauth2Proxy:
+  # OAuth2 Proxy image settings
+  repository: quay.io/oauth2-proxy/oauth2-proxy
+  imageTag: v7.15.2
   # Node selector for oauth2-proxy pods (overrides chart-level nodeSelector)
   nodeSelector: {}
   # Tolerations for oauth2-proxy pods (overrides chart-level tolerations)
@@ -223,7 +234,7 @@ authmiddleware:
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-authmiddleware
-  imageTag: latest
+  imageTag: v0.1.0-rc.2
   # Resource limits and requests
   resources:
     limits:
@@ -275,7 +286,7 @@ rotator:
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-rotator
-  imageTag: latest
+  imageTag: v0.1.0-rc.2
   # Rotation interval (how often to rotate keys)
   # Must be parseable as a duration (e.g., "15m", "1h")
   rotationInterval: "15m"
