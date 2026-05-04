@@ -27,6 +27,14 @@ spec:
     spec:
       serviceAccountName: jupyter-k8s-authmiddleware
       terminationGracePeriodSeconds: 30
+      {{- with .Values.authmiddleware.nodeSelector | default .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.authmiddleware.tolerations | default .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       initContainers:
       - name: wait-for-dex
         image: busybox:latest

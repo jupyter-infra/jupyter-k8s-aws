@@ -43,6 +43,14 @@ spec:
                   values:
                   - traefik
               topologyKey: kubernetes.io/hostname
+      {{- with .Values.traefik.nodeSelector | default .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.traefik.tolerations | default .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - image: {{ .Values.traefik.repository }}/{{ .Values.traefik.imageName }}:{{ .Values.traefik.imageTag }}
         imagePullPolicy: IfNotPresent

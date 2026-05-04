@@ -19,6 +19,14 @@ spec:
         component: oauth
     spec:
       serviceAccountName: dex
+      {{- with .Values.dex.nodeSelector | default .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dex.tolerations | default .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       initContainers:
       - name: wait-for-traefik
         image: busybox:latest

@@ -19,6 +19,14 @@ spec:
         component: web-app
     spec:
       serviceAccountName: web-app
+      {{- with .Values.webApp.nodeSelector | default .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.webApp.tolerations | default .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: web-app
         image: {{ .Values.webApp.repository }}/{{ .Values.webApp.imageName }}:{{ .Values.webApp.imageTag }}
