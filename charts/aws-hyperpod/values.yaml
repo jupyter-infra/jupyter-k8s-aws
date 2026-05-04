@@ -48,8 +48,8 @@ clusterWebUI:
   auth:
     replicas: 2
     imagePullPolicy: Always
-    repository: docker.io
-    imageName: jupyter-k8s-auth
+    repository: ghcr.io/jupyter-infra
+    imageName: jupyter-k8s-authmiddleware
     imageTag: latest
     resources:
       limits:
@@ -90,7 +90,7 @@ clusterWebUI:
   rotator:
     enabled: true
     imagePullPolicy: Always
-    repository: docker.io
+    repository: ghcr.io/jupyter-infra
     imageName: jupyter-k8s-rotator
     imageTag: latest
     rotationInterval: "15m"

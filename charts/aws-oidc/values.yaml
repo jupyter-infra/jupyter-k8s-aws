@@ -187,7 +187,7 @@ webApp:
   enabled: false
   replicas: 2
   imagePullPolicy: Always
-  repository: docker.io
+  repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-web-app
   imageTag: latest
   # Kubernetes namespace where workspaces are created and managed
@@ -221,8 +221,8 @@ authmiddleware:
   replicas: 1
   # Authmiddleware image settings
   imagePullPolicy: Always
-  repository: docker.io
-  imageName: jupyter-k8s-auth
+  repository: ghcr.io/jupyter-infra
+  imageName: jupyter-k8s-authmiddleware
   imageTag: latest
   # Resource limits and requests
   resources:
@@ -273,7 +273,7 @@ rotator:
   enabled: true
   # Rotator image settings
   imagePullPolicy: Always
-  repository: docker.io
+  repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-rotator
   imageTag: latest
   # Rotation interval (how often to rotate keys)
