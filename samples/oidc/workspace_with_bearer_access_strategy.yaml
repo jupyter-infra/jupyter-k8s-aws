@@ -11,7 +11,7 @@ spec:
   ownershipType: Public
   accessStrategy:
     name: bearer-access-strategy
-    namespace: default
+    namespace: jupyter-k8s-system
   resources:
     limits:
       cpu: "1"
