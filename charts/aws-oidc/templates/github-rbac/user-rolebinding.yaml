@@ -5,7 +5,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: github-workspace-binding-{{ $user }}
-  namespace: default
+  namespace: {{ .Values.githubRbac.namespace }}
   annotations:
     description: "Grants access to workspace.jupyter.org resources for user {{ $user }}"
 roleRef:
