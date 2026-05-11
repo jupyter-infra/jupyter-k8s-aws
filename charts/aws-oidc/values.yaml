@@ -139,7 +139,9 @@ accessStrategy:
   createOAuth: true
   # Create the bearer token access strategy (requires authmiddleware.enableBearerAuth)
   createBearer: false
-  # Create the target namespace if it doesn't exist
+  # Create the target namespace if it doesn't exist.
+  # Default is false because jupyter-k8s-system is created by the operator chart.
+  # Set to true only when targeting a namespace not managed by another Helm release.
   createNamespace: false
   # Namespace where the WorkspaceAccessStrategy resources are created
   namespace: jupyter-k8s-system
@@ -152,6 +154,8 @@ githubRbac:
   namespace: default
   # whether to create organization/team-based role and role bindings
   createOrgsRole: true
+  # Falls back to github.orgs when unset (empty [] is treated as unset by Helm).
+  # To disable RBAC subjects, set githubRbac.create: false — not an empty list.
   orgs: []
     # GitHub oauth can support teamless org membership access
     # However dex cannot match it to a group, so do NOT use
