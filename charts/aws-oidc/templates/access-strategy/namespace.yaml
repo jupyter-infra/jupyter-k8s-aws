@@ -1,0 +1,6 @@
+{{- if and (or .Values.accessStrategy.createOAuth .Values.accessStrategy.createBearer) .Values.accessStrategy.createNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.accessStrategy.namespace }}
+{{- end }}

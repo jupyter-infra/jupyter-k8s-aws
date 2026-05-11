@@ -1,12 +1,12 @@
+{{- if .Values.accessStrategy.createOAuth }}
 apiVersion: workspace.jupyter.org/v1alpha1
 kind: WorkspaceAccessStrategy
 metadata:
   name: oauth-access-strategy
-  namespace: default
+  namespace: {{ .Values.accessStrategy.namespace }}
 spec:
   displayName: JupyterLab Routing Strategy with GitHub authentication
   accessResourceTemplates:
-    # Network policy to restrict pod access
     - kind: NetworkPolicy
       apiVersion: networking.k8s.io/v1
       namePrefix: workspace-network-policy
@@ -14,15 +14,14 @@ spec:
         spec:
           podSelector:
             matchLabels:
-              workspace.jupyter.org/workspaceName: "{{ .Workspace.Name }}"
+              workspace.jupyter.org/workspaceName: "{{`{{ .Workspace.Name }}`}}"
           policyTypes:
           - Ingress
           ingress:
-          # Allow traffic from traefik pods in the router namespace
           - from:
             - namespaceSelector:
                 matchLabels:
-                  kubernetes.io/metadata.name: jupyter-k8s-router
+                  kubernetes.io/metadata.name: {{ .Values.namespace }}
               podSelector:
                 matchLabels:
                   app: traefik
@@ -30,7 +29,6 @@ spec:
             ports:
             - port: 8888
               protocol: TCP
-          # Allow traffic from the controller namespace
           - from:
             - namespaceSelector:
                 matchLabels:
@@ -38,7 +36,6 @@ spec:
             ports:
             - port: 8888
               protocol: TCP
-    # The authorized route - tries token verification on already authenticated requests
     - kind: IngressRoute
       apiVersion: traefik.io/v1alpha1
       namePrefix: authorized-route
@@ -47,20 +44,18 @@ spec:
           entryPoints:
             - websecure
           routes:
-            - match: "Host(`$DOMAIN`) && PathPrefix(`/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/`)"
+            - match: "Host(`{{ .Values.domain }}`) && PathPrefix(`/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/`)"
               kind: Rule
               priority: 100
               middlewares:
                 - name: auth-headers
-                  namespace: jupyter-k8s-router
+                  namespace: {{ .Values.namespace }}
                 - name: authmiddleware-verify
-                  namespace: jupyter-k8s-router
+                  namespace: {{ .Values.namespace }}
               services:
-                - name: "{{ .Service.Name }}"
-                  namespace: "{{ .Service.Namespace }}"
+                - name: "{{`{{ .Service.Name }}`}}"
+                  namespace: "{{`{{ .Service.Namespace }}`}}"
                   port: 8888
-
-    # The unauthorized route - handles auth path for initial authentication
     - kind: IngressRoute
       apiVersion: traefik.io/v1alpha1
       namePrefix: unauthorized-route
@@ -69,33 +64,34 @@ spec:
           entryPoints:
             - websecure
           routes:
-            - match: "Host(`$DOMAIN`) && PathPrefix(`/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/auth`)"
+            - match: "Host(`{{ .Values.domain }}`) && PathPrefix(`/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/auth`)"
               kind: Rule
-              priority: 110  # Higher priority specifically for auth paths
+              priority: 110
               middlewares:
                 - name: auth-headers
-                  namespace: jupyter-k8s-router
+                  namespace: {{ .Values.namespace }}
                 - name: oauth-auth-redirect
-                  namespace: jupyter-k8s-router
+                  namespace: {{ .Values.namespace }}
                 - name: authmiddleware-auth
-                  namespace: jupyter-k8s-router
+                  namespace: {{ .Values.namespace }}
                 - name: strip-auth-suffix
-                  namespace: jupyter-k8s-router
+                  namespace: {{ .Values.namespace }}
               services:
-                - name: "{{ .Service.Name }}"
-                  namespace: "{{ .Service.Namespace }}"
+                - name: "{{`{{ .Service.Name }}`}}"
+                  namespace: "{{`{{ .Service.Namespace }}`}}"
                   port: 8888
   deploymentModifications:
     podModifications:
       primaryContainerModifications:
         mergeEnv:
           - name: JUPYTER_BASE_URL
-            valueTemplate: "/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/"
-  accessURLTemplate: "https://$DOMAIN/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/auth"
+            valueTemplate: "/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/"
+  accessURLTemplate: "https://{{ .Values.domain }}/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/auth"
   accessStartupProbe:
     httpGet:
-      urlTemplate: "https://$DOMAIN/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/"
+      urlTemplate: "https://{{ .Values.domain }}/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/"
       additionalSuccessStatusCodes: [401]
     initialDelaySeconds: 1
     periodSeconds: 2
     failureThreshold: 20
+{{- end }}

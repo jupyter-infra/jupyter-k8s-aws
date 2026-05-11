@@ -155,7 +155,8 @@ helm-test-aws-oidc: ## Render and test aws-oidc chart
 		--set githubRbac.orgs[0].name=some-org \
 		--set githubRbac.orgs[0].teams[0]=ace-devs \
 		--set oauth2Proxy.cookieSecret=$(OAUTH2P_COOKIE_SECRET) \
-		--set authmiddleware.enableBearerAuth=true
+		--set authmiddleware.enableBearerAuth=true \
+		--set accessStrategy.createBearer=true
 	rm -rf /tmp/helm-test-chart
 	go test ./test/helm/aws-oidc -v
 
@@ -280,6 +281,7 @@ deploy-aws-oidc: setup-aws ## Deploy aws-oidc chart from .env config
 			--set authmiddleware.imageName=$(ECR_REPOSITORY_AUTH) \
 			--set authmiddleware.imageTag=latest \
 			--set authmiddleware.enableBearerAuth=true \
+			--set accessStrategy.createBearer=true \
 			--set rotator.repository=$(ECR_REGISTRY) \
 			--set rotator.imageName=$(ECR_REPOSITORY_ROTATOR) \
 			--set rotator.imageTag=latest"; \
@@ -457,21 +459,12 @@ undeploy-aws: ## Uninstall all Helm charts from remote cluster
 WS_NAMESPACE ?= default
 
 .PHONY: apply-sample-oidc
-apply-sample-oidc: ## Create sample OIDC workspaces with access strategies
-	@( \
-		set -e; \
-		. ./.env; \
-		export DOMAIN=$${OIDC_DOMAIN:-$$HYPERPOD_DOMAIN}; \
-		kubectl apply -f samples/oidc/workspace_access_strategy.yaml --dry-run=client -o yaml | envsubst | kubectl apply -f -; \
-		kubectl apply -f samples/oidc/workspace_access_strategy_bearer.yaml --dry-run=client -o yaml | envsubst | kubectl apply -f -; \
-		kubectl apply -k samples/oidc --dry-run=client -o yaml | envsubst | kubectl apply -f -; \
-	)
+apply-sample-oidc: ## Create sample OIDC workspaces (access strategies are shipped by the aws-oidc chart)
+	kubectl apply -k samples/oidc
 
 .PHONY: delete-sample-oidc
-delete-sample-oidc: ## Delete sample OIDC workspaces and access strategies
+delete-sample-oidc: ## Delete sample OIDC workspaces
 	kubectl delete -k samples/oidc
-	kubectl delete -f samples/oidc/workspace_access_strategy.yaml
-	kubectl delete -f samples/oidc/workspace_access_strategy_bearer.yaml
 
 .PHONY: apply-sample-hyperpod
 apply-sample-hyperpod: ## Create sample hyperpod workspaces. Usage: make apply-sample-hyperpod WS_USER=alice

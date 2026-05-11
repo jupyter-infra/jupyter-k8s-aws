@@ -33,6 +33,11 @@
 {{- fail "oauth2Proxy.cookieSecret is required" }}
 {{- end }}
 
+{{/* Validate: bearer access strategy requires enableBearerAuth */}}
+{{- if and .Values.accessStrategy.createBearer (not .Values.authmiddleware.enableBearerAuth) }}
+{{- fail "accessStrategy.createBearer requires authmiddleware.enableBearerAuth to be true" }}
+{{- end }}
+
 {{/* Validate JWT refresh settings */}}
 {{- $jwtRefreshWindowSeconds := 0 }}
 {{- if hasSuffix "h" .Values.authmiddleware.jwtRefreshWindow }}

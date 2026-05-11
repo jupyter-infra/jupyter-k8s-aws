@@ -13,7 +13,7 @@ spec:
   ownershipType: OwnerOnly
   accessStrategy:
     name: oauth-access-strategy
-    namespace: default
+    namespace: jupyter-k8s-system
   resources:
     limits:
       cpu: "1"
