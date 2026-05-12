@@ -5,7 +5,11 @@ Distributed under the terms of the MIT license
 
 package awsplugin
 
-import "github.com/jupyter-infra/jupyter-k8s-plugin/plugin"
+import (
+	"strings"
+
+	"github.com/jupyter-infra/jupyter-k8s-plugin/plugin"
+)
 
 // --- Pod event context keys ---
 // These are resolved from podEventsContext (RegisterNodeAgent / DeregisterNodeAgent).
@@ -46,15 +50,22 @@ var (
 // These are resolved from createConnectionContext (CreateSession).
 
 var (
-	// VSCodeScheme is the URL scheme for VSCode remote connections.
-	VSCodeScheme = plugin.ContextEntry{
-		Key:     "vscodeScheme",
-		Default: "vscode://amazonwebservices.aws-toolkit-vscode/connect/workspace",
-	}
-
 	// MaxConcurrentSSMSessions is the maximum concurrent SSM sessions per managed instance.
 	MaxConcurrentSSMSessions = plugin.ContextEntry{
 		Key:     "maxConcurrentSSMSessions",
 		Default: "10",
 	}
 )
+
+// connectionScheme returns a ContextEntry for the given connection type.
+// The key is derived by stripping "-remote" and appending "Scheme":
+//
+//	"vscode-remote" → key "vscodeScheme", default "vscode://amazonwebservices.aws-toolkit-vscode/connect/workspace"
+//	"kiro-remote"   → key "kiroScheme",   default "kiro://amazonwebservices.aws-toolkit-kiro/connect/workspace"
+func connectionScheme(connectionType string) plugin.ContextEntry {
+	ide := strings.TrimSuffix(connectionType, "-remote")
+	return plugin.ContextEntry{
+		Key:     ide + "Scheme",
+		Default: ide + "://amazonwebservices.aws-toolkit-" + ide + "/connect/workspace",
+	}
+}

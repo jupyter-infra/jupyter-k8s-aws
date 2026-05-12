@@ -137,12 +137,8 @@ var _ = Describe("AWS HyperPod Resources", func() {
 		// Verify plugin handler references
 		Expect(content).To(ContainSubstring("podEventsHandler: \"aws:ssm-remote-access\""),
 			"AccessStrategy should have podEventsHandler referencing aws plugin")
-		Expect(content).To(ContainSubstring("vscode-remote: \"aws:createSession\""),
-			"AccessStrategy should have createConnectionHandlerMap entry for vscode-remote")
-
-		// Verify k8s-native is the default connection handler
-		Expect(content).To(ContainSubstring("createConnectionHandler: \"k8s-native\""),
-			"AccessStrategy should have k8s-native as default createConnectionHandler")
+		Expect(content).To(ContainSubstring("createConnectionHandler: \"aws:createSession\""),
+			"AccessStrategy should have aws:createSession as catch-all createConnectionHandler")
 
 		// Verify podEventsContext has required keys
 		Expect(content).To(ContainSubstring("sidecarContainerName:"),

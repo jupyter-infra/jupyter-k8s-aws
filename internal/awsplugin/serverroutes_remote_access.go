@@ -114,14 +114,17 @@ func (h *AWSRemoteAccessRoutes) DeregisterNodeAgent(ctx context.Context, req *pl
 	return &pluginapi.DeregisterNodeAgentResponse{}, nil
 }
 
-// CreateSession creates an SSM session for VSCode remote connection.
+// CreateSession creates an SSM session for a remote IDE connection.
 func (h *AWSRemoteAccessRoutes) CreateSession(ctx context.Context, req *pluginapi.CreateSessionRequest) (*pluginapi.CreateSessionResponse, error) {
 	logger := logr.FromContextOrDiscard(ctx).WithName("remote-access-handler")
 	cctx := req.ConnectionContext
 
 	// Resolve overridable constants from connectionContext
 	podUIDTagKey := WorkspacePodUIDTagKey.ResolveStr(cctx)
-	vscodeScheme := VSCodeScheme.ResolveStr(cctx)
+	if req.ConnectionType == "" {
+		return nil, fmt.Errorf("connectionType is required")
+	}
+	scheme := connectionScheme(req.ConnectionType).ResolveStr(cctx)
 	maxSessions := MaxConcurrentSSMSessions.ResolveInt32(cctx)
 
 	// Find the managed instance by pod UID
@@ -148,10 +151,10 @@ func (h *AWSRemoteAccessRoutes) CreateSession(ctx context.Context, req *pluginap
 		return nil, fmt.Errorf("failed to start SSM session: %w", err)
 	}
 
-	// Build VSCode connection URL
+	// Build connection URL
 	clusterARN := os.Getenv("CLUSTER_ID")
 	connectionURL := fmt.Sprintf("%s?sessionId=%s&sessionToken=%s&streamUrl=%s&workspaceName=%s&namespace=%s&eksClusterArn=%s",
-		vscodeScheme,
+		scheme,
 		sessionInfo.SessionID,
 		sessionInfo.TokenValue,
 		sessionInfo.StreamURL,
