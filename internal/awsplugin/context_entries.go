@@ -66,6 +66,6 @@ func connectionScheme(connectionType string) plugin.ContextEntry {
 	ide := strings.TrimSuffix(connectionType, "-remote")
 	return plugin.ContextEntry{
 		Key:     ide + "Scheme",
-		Default: ide + "://amazonwebservices.aws-toolkit-" + ide + "/connect/workspace",
+		Default: ide + "://amazonwebservices.aws-toolkit-vscode/connect/workspace",
 	}
 }

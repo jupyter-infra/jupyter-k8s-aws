@@ -223,7 +223,7 @@ func TestAWSRemoteAccessRoutes_CreateSession_KiroRemote(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
-	assert.Contains(t, resp.ConnectionURL, "kiro://amazonwebservices.aws-toolkit-kiro/connect/workspace")
+	assert.Contains(t, resp.ConnectionURL, "kiro://amazonwebservices.aws-toolkit-vscode/connect/workspace")
 	assert.Contains(t, resp.ConnectionURL, "sess-kiro")
 	assert.NotContains(t, resp.ConnectionURL, "vscode://")
 	mockSSM.AssertExpectations(t)
@@ -263,7 +263,7 @@ func TestAWSRemoteAccessRoutes_CreateSession_CursorRemote(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
-	assert.Contains(t, resp.ConnectionURL, "cursor://amazonwebservices.aws-toolkit-cursor/connect/workspace")
+	assert.Contains(t, resp.ConnectionURL, "cursor://amazonwebservices.aws-toolkit-vscode/connect/workspace")
 	assert.NotContains(t, resp.ConnectionURL, "vscode://")
 	mockSSM.AssertExpectations(t)
 }
@@ -302,7 +302,7 @@ func TestAWSRemoteAccessRoutes_CreateSession_UnknownRemoteType(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
-	assert.Contains(t, resp.ConnectionURL, "windsurf://amazonwebservices.aws-toolkit-windsurf/connect/workspace")
+	assert.Contains(t, resp.ConnectionURL, "windsurf://amazonwebservices.aws-toolkit-vscode/connect/workspace")
 	assert.NotContains(t, resp.ConnectionURL, "vscode://")
 	mockSSM.AssertExpectations(t)
 }
@@ -343,7 +343,7 @@ func TestAWSRemoteAccessRoutes_CreateSession_SchemeOverrideViaContext(t *testing
 
 	assert.NoError(t, err)
 	assert.Contains(t, resp.ConnectionURL, "kiro://custom.kiro.dev/workspace")
-	assert.NotContains(t, resp.ConnectionURL, "aws-toolkit-kiro")
+	assert.NotContains(t, resp.ConnectionURL, "aws-toolkit-vscode")
 	mockSSM.AssertExpectations(t)
 }
 
@@ -372,9 +372,9 @@ func TestConnectionScheme(t *testing.T) {
 		expectedScheme string
 	}{
 		{"vscode-remote", "vscodeScheme", "vscode://amazonwebservices.aws-toolkit-vscode/connect/workspace"},
-		{"kiro-remote", "kiroScheme", "kiro://amazonwebservices.aws-toolkit-kiro/connect/workspace"},
-		{"cursor-remote", "cursorScheme", "cursor://amazonwebservices.aws-toolkit-cursor/connect/workspace"},
-		{"windsurf-remote", "windsurfScheme", "windsurf://amazonwebservices.aws-toolkit-windsurf/connect/workspace"},
+		{"kiro-remote", "kiroScheme", "kiro://amazonwebservices.aws-toolkit-vscode/connect/workspace"},
+		{"cursor-remote", "cursorScheme", "cursor://amazonwebservices.aws-toolkit-vscode/connect/workspace"},
+		{"windsurf-remote", "windsurfScheme", "windsurf://amazonwebservices.aws-toolkit-vscode/connect/workspace"},
 	}
 
 	for _, tt := range tests {
