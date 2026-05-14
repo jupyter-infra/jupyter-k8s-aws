@@ -71,6 +71,8 @@ spec:
   {{- if .Values.remoteAccess.enabled }}
   createConnectionHandlerMap:
     vscode-remote: "aws:createSession"
+    kiro-remote: "aws:createSession"
+    cursor-remote: "aws:createSession"
   {{- end }}
   podEventsHandler: "aws:ssm-remote-access"
 
