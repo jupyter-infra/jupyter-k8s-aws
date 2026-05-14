@@ -67,10 +67,12 @@ spec:
     failureThreshold: 20
   {{- end }}
 
-  {{- if .Values.remoteAccess.enabled }}
-  createConnectionHandler: "aws:createSession"
-  {{- else }}
   createConnectionHandler: "k8s-native"
+  {{- if .Values.remoteAccess.enabled }}
+  createConnectionHandlerMap:
+    vscode-remote: "aws:createSession"
+    kiro-remote: "aws:createSession"
+    cursor-remote: "aws:createSession"
   {{- end }}
   podEventsHandler: "aws:ssm-remote-access"
 
