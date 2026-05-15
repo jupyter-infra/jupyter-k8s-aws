@@ -216,8 +216,8 @@ webApp:
   replicas: 2
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
-  imageName: jupyter-k8s-web-app
-  imageTag: latest
+  imageName: jupyter-k8s-ui
+  imageTag: v0.1.0-rc.1
   # Kubernetes namespace where workspaces are created and managed
   namespace: default
   resources:
