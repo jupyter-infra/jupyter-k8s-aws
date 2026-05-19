@@ -89,6 +89,10 @@ dex:
   traefikCheck:
     # Maximum time to wait for traefik availability
     timeout_seconds: 60
+  # initContainer config for TLS certificate readiness checks
+  certCheck:
+    # Maximum time to wait for TLS certificate to be ready
+    timeout_seconds: 300
 
   # Node selector for dex pods (overrides chart-level nodeSelector)
   nodeSelector: {}

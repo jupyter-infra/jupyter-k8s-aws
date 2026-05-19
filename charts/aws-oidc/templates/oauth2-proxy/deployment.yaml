@@ -72,6 +72,7 @@ spec:
         - --cookie-domain={{ .Values.domain }}
         - --cookie-path=/
         - --session-store-type=cookie
+        - --approval-prompt=auto
         - --skip-provider-button=true
         - --set-xauthrequest=true
         - --set-authorization-header=true
