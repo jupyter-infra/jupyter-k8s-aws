@@ -36,7 +36,7 @@ spec:
         - -c
         - |
           echo "Waiting for Traefik service to be available..."
-          timeout={{ .Values.dex.traefikCheck.timeout_seconds }}  # Timeout in seconds
+          timeout={{ .Values.dex.traefikCheck.timeout_seconds }}
           counter=0
           interval=5
           until wget -q -O - http://traefik-healthcheck.{{ .Values.namespace }}:9000/ping > /dev/null 2>&1; do
@@ -48,7 +48,27 @@ spec:
               break
             fi
           done
-          echo "Traefik service is available or timeout reached!"
+          echo "Traefik service is available!"
+
+          echo "Waiting for TLS certificate to be ready..."
+          APISERVER=https://kubernetes.default.svc
+          TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+          NAMESPACE={{ .Values.namespace }}
+          timeout={{ .Values.dex.certCheck.timeout_seconds }}
+          counter=0
+          while true; do
+            RESP=$(wget -q --no-check-certificate --header="Authorization: Bearer $TOKEN" \
+              -O - "$APISERVER/apis/cert-manager.io/v1/namespaces/$NAMESPACE/certificates/traefik-cert" 2>/dev/null || true)
+            if echo "$RESP" | grep -q '"reason": "Ready"'; then break; fi
+            echo "TLS certificate is not yet ready, retrying in ${interval}s... (${counter}/${timeout}s)"
+            sleep $interval
+            counter=$((counter + interval))
+            if [ $counter -ge $timeout ]; then
+              echo "Timeout after ${timeout}s waiting for TLS certificate. Continuing anyway..."
+              break
+            fi
+          done
+          echo "TLS certificate is ready!"
       containers:
       - name: dex
         image: {{ .Values.dex.repository }}:{{ .Values.dex.imageTag }}
