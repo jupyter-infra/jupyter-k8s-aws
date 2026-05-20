@@ -28,11 +28,6 @@ var _ = Describe("Image Pinning", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	// Components excluded from the :latest check (no published versioned image yet)
-	var excludedComponents = map[string]bool{
-		"web-app": true,
-	}
-
 	It("should not use :latest tag in any deployment image", func() {
 		testOutputDir := filepath.Join(
 			rootDir, "dist/test-output/aws-oidc/jupyter-k8s-aws-oidc/templates")
@@ -45,10 +40,6 @@ var _ = Describe("Image Pinning", func() {
 			}
 
 			rel, _ := filepath.Rel(testOutputDir, path)
-			component := strings.Split(rel, string(filepath.Separator))[0]
-			if excludedComponents[component] {
-				return nil
-			}
 
 			data, err := os.ReadFile(path)
 			if err != nil {
