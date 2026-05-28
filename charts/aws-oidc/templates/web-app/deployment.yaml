@@ -63,6 +63,23 @@ spec:
           value: {{ .Values.webApp.session.newKeyUseDelaySecs | quote }}
         - name: SESSION_EXPECTED_DOMAIN
           value: {{ .Values.domain | quote }}
+        {{- if .Values.webApp.clusterAccess.clusterName }}
+        # Kubectl access page: clusterName gates the feature — empty means disabled
+        - name: CLUSTER_NAME
+          value: {{ .Values.webApp.clusterAccess.clusterName | quote }}
+        - name: CLUSTER_API_SERVER
+          value: {{ .Values.webApp.clusterAccess.apiServer | quote }}
+        - name: CLUSTER_CA_CERT_BASE64
+          value: {{ .Values.webApp.clusterAccess.caCertBase64 | quote }}
+        - name: OIDC_ISSUER_URL
+          value: "https://{{ .Values.domain }}/dex"
+        - name: OIDC_CLIENT_ID
+          value: {{ .Values.dex.kubernetesClientId | quote }}
+        - name: OIDC_CLIENT_SECRET
+          value: {{ include "defaulter.oauth2ProxyClientSecret" . }}
+        - name: OIDC_CALLBACK_PORT
+          value: {{ .Values.webApp.clusterAccess.oidcCallbackPort | default 9800 | quote }}
+        {{- end }}
         resources:
           {{- toYaml .Values.webApp.resources | nindent 10 }}
         livenessProbe:

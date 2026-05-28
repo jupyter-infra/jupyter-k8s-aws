@@ -240,6 +240,21 @@ webApp:
     secretName: "web-app-session-secret"
     numberOfKeys: 3
     newKeyUseDelaySecs: 5
+  # Kubectl access page — lets users download a kubeconfig setup script.
+  # clusterName gates the feature: set it to enable, leave empty to disable.
+  # We use clusterName rather than a separate 'enabled' flag because these values
+  # have no defaults — they come from the EKS cluster at deploy time. If clusterName
+  # is set, the admin has opted in and provided the companion values (apiServer, caCert).
+  # OIDC issuer URL and client ID/secret are derived from chart values (domain + dex.*).
+  clusterAccess:
+    # Cluster name shown in kubeconfig context
+    clusterName: ""
+    # K8s API server URL (e.g., https://XXXXX.gr7.us-west-2.eks.amazonaws.com)
+    apiServer: ""
+    # Base64-encoded cluster CA certificate (kubectl config embeds this)
+    caCertBase64: ""
+    # Localhost port for kubelogin OIDC callback
+    oidcCallbackPort: 9800
 
 # Authmiddleware configuration
 authmiddleware:
