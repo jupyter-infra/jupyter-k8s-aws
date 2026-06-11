@@ -221,7 +221,7 @@ webApp:
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-ui
-  imageTag: v0.1.0
+  imageTag: v0.1.1
   # Kubernetes namespace where workspaces are created and managed
   namespace: default
   resources:
