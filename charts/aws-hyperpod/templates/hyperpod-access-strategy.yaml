@@ -60,8 +60,8 @@ spec:
   bearerAuthURLTemplate: "https://{{`{{ .Workspace.Name }}`}}-{{`{{ b32encode .Workspace.Namespace }}`}}.{{ .Values.clusterWebUI.domain }}/bearer-auth"
   accessStartupProbe:
     httpGet:
-      urlTemplate: "https://{{`{{ .Workspace.Name }}`}}-{{`{{ b32encode .Workspace.Namespace }}`}}.{{ .Values.clusterWebUI.domain }}/"
-      additionalSuccessStatusCodes: [401]
+      urlTemplate: "https://{{`{{ .Workspace.Name }}`}}-{{`{{ b32encode .Workspace.Namespace }}`}}.{{ .Values.clusterWebUI.domain }}/bearer-auth"
+      additionalSuccessStatusCodes: [400]
     initialDelaySeconds: 1
     periodSeconds: 2
     failureThreshold: 20

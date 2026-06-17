@@ -143,6 +143,11 @@ accessStrategy:
   createOAuth: true
   # Create the bearer token access strategy (requires authmiddleware.enableBearerAuth)
   createBearer: false
+  # Create per-workspace NetworkPolicy as an access resource.
+  # Set to false when namespace-level network policies are managed externally
+  # (e.g. by the deployment template) or when large workspace counts make
+  # per-workspace netpols undesirable.
+  createNetworkPolicy: true
   # Create the target namespace if it doesn't exist.
   # Default is false because jupyter-k8s-system is created by the operator chart.
   # Set to true only when targeting a namespace not managed by another Helm release.

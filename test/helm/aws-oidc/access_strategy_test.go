@@ -179,6 +179,100 @@ var _ = Describe("Access Strategy", func() {
 		})
 	})
 
+	Context("startup probe paths", func() {
+		var templatesDir string
+
+		BeforeEach(func() {
+			outputDir := GinkgoT().TempDir()
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+			args := append(minimalOIDCArgs,
+				"--set", "accessStrategy.createBearer=true",
+				"--set", "authmiddleware.enableBearerAuth=true",
+			)
+			helmTemplate(chartDir, outputDir, args...)
+			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
+		})
+
+		It("should probe the /auth path for the oauth strategy", func() {
+			data, err := os.ReadFile(filepath.Join(templatesDir, "access-strategy/oauth-access-strategy.yaml"))
+			Expect(err).NotTo(HaveOccurred())
+			content := string(data)
+			Expect(content).To(ContainSubstring("/auth"))
+			Expect(content).To(ContainSubstring("additionalSuccessStatusCodes: [302]"))
+			Expect(content).NotTo(ContainSubstring("additionalSuccessStatusCodes: [401]"))
+		})
+
+		It("should probe the /bearer-auth path for the bearer strategy", func() {
+			data, err := os.ReadFile(filepath.Join(templatesDir, "access-strategy/bearer-access-strategy.yaml"))
+			Expect(err).NotTo(HaveOccurred())
+			content := string(data)
+			Expect(content).To(ContainSubstring("/bearer-auth"))
+			Expect(content).To(ContainSubstring("additionalSuccessStatusCodes: [400]"))
+		})
+	})
+
+	Context("with createNetworkPolicy=true (default)", func() {
+		var templatesDir string
+
+		BeforeEach(func() {
+			outputDir := GinkgoT().TempDir()
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+			args := append(minimalOIDCArgs,
+				"--set", "accessStrategy.createBearer=true",
+				"--set", "authmiddleware.enableBearerAuth=true",
+			)
+			helmTemplate(chartDir, outputDir, args...)
+			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
+		})
+
+		It("should include NetworkPolicy in both access strategies", func() {
+			strategies := []string{
+				"access-strategy/oauth-access-strategy.yaml",
+				"access-strategy/bearer-access-strategy.yaml",
+			}
+			for _, s := range strategies {
+				data, err := os.ReadFile(filepath.Join(templatesDir, s))
+				Expect(err).NotTo(HaveOccurred(), "Failed to read %s", s)
+				content := string(data)
+				Expect(content).To(ContainSubstring("kind: NetworkPolicy"), "%s should contain NetworkPolicy", s)
+				Expect(content).To(ContainSubstring("kind: IngressRoute"), "%s should contain IngressRoute", s)
+			}
+		})
+	})
+
+	Context("with createNetworkPolicy=false", func() {
+		var templatesDir string
+
+		BeforeEach(func() {
+			outputDir := GinkgoT().TempDir()
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+			args := append(minimalOIDCArgs,
+				"--set", "accessStrategy.createBearer=true",
+				"--set", "authmiddleware.enableBearerAuth=true",
+				"--set", "accessStrategy.createNetworkPolicy=false",
+			)
+			helmTemplate(chartDir, outputDir, args...)
+			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
+		})
+
+		It("should not include NetworkPolicy but still have IngressRoute", func() {
+			strategies := []string{
+				"access-strategy/oauth-access-strategy.yaml",
+				"access-strategy/bearer-access-strategy.yaml",
+			}
+			for _, s := range strategies {
+				data, err := os.ReadFile(filepath.Join(templatesDir, s))
+				Expect(err).NotTo(HaveOccurred(), "Failed to read %s", s)
+				content := string(data)
+				Expect(content).NotTo(ContainSubstring("kind: NetworkPolicy"), "%s should NOT contain NetworkPolicy", s)
+				Expect(content).To(ContainSubstring("kind: IngressRoute"), "%s should still contain IngressRoute", s)
+			}
+		})
+	})
+
 	Context("bearer validation", func() {
 		It("should fail when createBearer is true but enableBearerAuth is false", func() {
 			rootDir, err := filepath.Abs("../../..")

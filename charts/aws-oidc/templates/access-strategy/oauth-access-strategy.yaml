@@ -7,6 +7,7 @@ metadata:
 spec:
   displayName: JupyterLab Routing Strategy with GitHub authentication
   accessResourceTemplates:
+    {{- if .Values.accessStrategy.createNetworkPolicy }}
     - kind: NetworkPolicy
       apiVersion: networking.k8s.io/v1
       namePrefix: workspace-network-policy
@@ -36,6 +37,7 @@ spec:
             ports:
             - port: 8888
               protocol: TCP
+    {{- end }}
     - kind: IngressRoute
       apiVersion: traefik.io/v1alpha1
       namePrefix: authorized-route
@@ -89,8 +91,8 @@ spec:
   accessURLTemplate: "https://{{ .Values.domain }}/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/auth"
   accessStartupProbe:
     httpGet:
-      urlTemplate: "https://{{ .Values.domain }}/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/"
-      additionalSuccessStatusCodes: [401]
+      urlTemplate: "https://{{ .Values.domain }}/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/auth"
+      additionalSuccessStatusCodes: [302]
     initialDelaySeconds: 1
     periodSeconds: 2
     failureThreshold: 20

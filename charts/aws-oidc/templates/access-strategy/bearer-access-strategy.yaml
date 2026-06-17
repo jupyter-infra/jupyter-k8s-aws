@@ -8,6 +8,7 @@ spec:
   displayName: JupyterLab Routing Strategy with bearer token authentication
   createConnectionHandler: "k8s-native"
   accessResourceTemplates:
+    {{- if .Values.accessStrategy.createNetworkPolicy }}
     - kind: NetworkPolicy
       apiVersion: networking.k8s.io/v1
       namePrefix: workspace-network-policy
@@ -37,6 +38,7 @@ spec:
             ports:
             - port: 8888
               protocol: TCP
+    {{- end }}
     - kind: IngressRoute
       apiVersion: traefik.io/v1alpha1
       namePrefix: authorized-route
@@ -89,8 +91,8 @@ spec:
   bearerAuthURLTemplate: "https://{{ .Values.domain }}/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/bearer-auth"
   accessStartupProbe:
     httpGet:
-      urlTemplate: "https://{{ .Values.domain }}/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/"
-      additionalSuccessStatusCodes: [401]
+      urlTemplate: "https://{{ .Values.domain }}/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/bearer-auth"
+      additionalSuccessStatusCodes: [400]
     initialDelaySeconds: 1
     periodSeconds: 2
     failureThreshold: 20
