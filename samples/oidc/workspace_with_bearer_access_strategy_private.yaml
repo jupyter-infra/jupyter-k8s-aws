@@ -5,13 +5,15 @@ metadata:
   namespace: default
 spec:
   displayName: "Private Workspace with Bearer Auth"
-  image: uv
+  # Container image to use; keep commented for JD-based deployment
+  # uncomment below for standalone deployment
+  # image: uv
   desiredStatus: Running
   accessType: OwnerOnly
   ownershipType: OwnerOnly
   accessStrategy:
     name: bearer-access-strategy
-    namespace: jupyter-k8s-system
+    namespace: jupyter-k8s-shared
   resources:
     limits:
       cpu: "1"

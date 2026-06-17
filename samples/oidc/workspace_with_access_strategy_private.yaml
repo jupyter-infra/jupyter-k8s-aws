@@ -5,15 +5,15 @@ metadata:
   namespace: default
 spec:
   displayName: "Sample Workspace with Access Strategy"
-  # Container image to use
-  # Using the built-in 'uv' image shortcut
-  image: uv
+  # Container image to use; keep commented for JD-based deployment
+  # uncomment below for standalone deployment
+  # image: uv
   desiredStatus: Running
   accessType: OwnerOnly
   ownershipType: OwnerOnly
   accessStrategy:
     name: oauth-access-strategy
-    namespace: jupyter-k8s-system
+    namespace: jupyter-k8s-shared
   resources:
     limits:
       cpu: "1"
