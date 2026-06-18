@@ -285,6 +285,7 @@ deploy-aws-oidc: setup-aws ## Deploy aws-oidc chart from .env config
 			--set rotator.repository=$(ECR_REGISTRY) \
 			--set rotator.imageName=$(ECR_REPOSITORY_ROTATOR) \
 			--set rotator.imageTag=latest"; \
+		HELM_ARGS="$$HELM_ARGS --set accessStrategy.namespace=jupyter-k8s-shared"; \
 		if [ ! -z "$$DEX_OAUTH2_SECRET" ]; then \
 			HELM_ARGS="$$HELM_ARGS --set dex.oauth2ProxyClientSecret=$$DEX_OAUTH2_SECRET"; \
 		fi; \
@@ -311,10 +312,9 @@ deploy-aws-oidc: setup-aws ## Deploy aws-oidc chart from .env config
 			done; \
 		fi; \
 		\
-		helm upgrade --install jk8-aws-oidc /tmp/jk8s-aws-oidc \
+		helm upgrade --install jupyter-k8s-aws-oidc /tmp/jk8s-aws-oidc \
 			-n jupyter-k8s-router \
 			--create-namespace \
-			--force \
 			$$HELM_ARGS; \
 		\
 		$(SHELL) scripts/aws-oidc/generate-client.sh \
@@ -450,7 +450,7 @@ undeploy-aws-hyperpod: ## Remove aws-hyperpod chart
 .PHONY: undeploy-aws
 undeploy-aws: ## Uninstall all Helm charts from remote cluster
 	@echo "Undeploying Helm charts from remote AWS cluster..."
-	helm uninstall jk8-aws-oidc -n jupyter-k8s-router --ignore-not-found
+	helm uninstall jupyter-k8s-aws-oidc -n jupyter-k8s-router --ignore-not-found
 	helm uninstall aws-hyperpod -n jupyter-k8s-system --ignore-not-found
 	helm uninstall traefik-crd --ignore-not-found
 
