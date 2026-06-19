@@ -87,6 +87,7 @@ spec:
         mergeEnv:
           - name: JUPYTER_BASE_URL
             valueTemplate: "/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/"
+  applicationBasePathTemplate: "/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/"
   accessURLTemplate: "https://{{ .Values.domain }}/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/"
   bearerAuthURLTemplate: "https://{{ .Values.domain }}/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/bearer-auth"
   accessStartupProbe:
