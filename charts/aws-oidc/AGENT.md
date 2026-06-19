@@ -34,7 +34,12 @@ make kubectl-aws                      # switch kubectl context
 If there's an existing deployment, tear it down in dependency order:
 
 ```bash
+# Order matters: workspaces → templates → access strategies → helm charts → CRDs.
+# Templates hold finalizers on access strategies (jupyter-k8s#396), so deleting
+# templates first releases the hold and allows access strategy cleanup to proceed.
 kubectl delete workspaces --all --all-namespaces --wait
+kubectl delete workspacetemplates --all --all-namespaces --wait
+kubectl delete workspaceaccessstrategies --all --all-namespaces --wait
 helm uninstall jupyter-k8s-aws-oidc -n jupyter-k8s-router 2>/dev/null; true
 helm uninstall jupyter-k8s -n jupyter-k8s-system 2>/dev/null; true
 kubectl delete crd workspaces.workspace.jupyter.org \
