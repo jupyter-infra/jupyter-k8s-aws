@@ -16,7 +16,10 @@ make setup-aws                        # configure kubectl context from .env
 ```
 
 **Default cluster:** `jupyter-k8s-cluster` in `us-west-2` (`.env` defaults).
-If switching from another cluster (e.g. parker in us-east-2), update `.env` and run:
+If your cluster has a different name (e.g. `jupyter-deploy-eks-*`), update
+`EKS_CLUSTER_NAME` in `.env` before running any deploy targets.
+
+To switch kubectl context without re-running full setup:
 
 ```bash
 make kubectl-aws                      # switch kubectl context
@@ -24,32 +27,71 @@ make kubectl-aws                      # switch kubectl context
 
 ## Clean Slate
 
+> **⚠️  DESTRUCTIVE — This deletes ALL workspaces, uninstalls ALL Helm releases,
+> and removes CRDs from the cluster. Only run this on a development/sandbox cluster.
+> Never run against a shared or production cluster. There is no undo.**
+
 If there's an existing deployment, tear it down in dependency order:
 
 ```bash
+# Order matters: workspaces → templates → access strategies → helm charts → CRDs.
+# Templates hold finalizers on access strategies (jupyter-k8s#396), so deleting
+# templates first releases the hold and allows access strategy cleanup to proceed.
 kubectl delete workspaces --all --all-namespaces --wait
-helm uninstall aws-oidc -n jupyter-k8s-system 2>/dev/null; true
-helm uninstall jk8s -n jupyter-k8s-system
+kubectl delete workspacetemplates --all --all-namespaces --wait
+kubectl delete workspaceaccessstrategies --all --all-namespaces --wait
+helm uninstall jupyter-k8s-aws-oidc -n jupyter-k8s-router 2>/dev/null; true
+helm uninstall jupyter-k8s -n jupyter-k8s-system 2>/dev/null; true
 kubectl delete crd workspaces.workspace.jupyter.org \
   workspaceaccessstrategies.workspace.jupyter.org \
   workspacetemplates.workspace.jupyter.org 2>/dev/null; true
 ```
 
-## Build and Generate
+Note: The Helm release name depends on how the cluster was deployed:
+
+- `jd apply` (terraform): release name is `jupyter-k8s-aws-oidc`
+- `make deploy-aws-oidc`: release name is `jk8-aws-oidc`
+
+Check with `helm list -n jupyter-k8s-router` before uninstalling.
+
+## Build and Validate
 
 ```bash
 make build                            # compile Go binaries
-make helm-generate                    # generate dist/chart from config/
-make helm-lint                        # lint all charts (operator + guided)
+make helm-lint                        # lint all charts
+make helm-test                        # render + run Go tests against rendered output
+```
+
+Shorthand for all pre-PR checks:
+
+```bash
+make release                          # runs: build lint test helm-lint helm-test
 ```
 
 ## Deploy
 
-The OSS chart is deployed without plugins:
+The controller (from the sibling `jupyter-k8s` repo) must be deployed first — it installs the CRDs:
 
 ```bash
-make deploy-aws                       # operator chart WITHOUT PLUGINS=aws
+make deploy-controller                # operator chart (no aws-plugin sidecar)
 make deploy-aws-oidc                  # OSS guided chart (reads .env for domain, GitHub, EFS)
+```
+
+If `make deploy-controller` fails (e.g. missing `jupyter-k8s` checkout), you can install
+just the CRDs as a fallback so `deploy-aws-oidc` can proceed:
+
+```bash
+kubectl apply -f ../jupyter-k8s/config/crd/bases/
+```
+
+### Helm release name conflict
+
+If the cluster was previously deployed via `jd` (terraform), the existing Helm release is
+named `jupyter-k8s-aws-oidc`. The Makefile uses `jk8-aws-oidc`. Deploying with the Makefile
+will fail with resource ownership errors. In this case, upgrade the existing release directly:
+
+```bash
+helm upgrade jupyter-k8s-aws-oidc ./charts/aws-oidc -n jupyter-k8s-router --reuse-values
 ```
 
 **Checks:**
@@ -72,23 +114,18 @@ make deploy-aws-oidc                  # OSS guided chart (reads .env for domain,
    kubectl logs -n jupyter-k8s-system -l control-plane=controller-manager -c manager --tail=20
    ```
 
-4. **AccessStrategy uses k8s-native only** (no `createConnectionHandlerMap`, no `podEventsContext`):
-   ```bash
-   kubectl get workspaceaccessstrategy -n jupyter-k8s-system -o yaml
-   ```
-   - `createConnectionHandler: "k8s-native"`
-   - No `podEventsHandler`, `createConnectionHandlerMap`, or `podEventsContext` fields
+4. **Full routing stack is running**:
 
-5. **Full routing stack is running**:
    ```bash
-   kubectl get pods -n jupyter-k8s-system
+   kubectl get pods -n jupyter-k8s-router
    ```
-   Expect: controller, authmiddleware replicas, traefik replicas, and completed rotator jobs.
+
+   Expect: traefik, oauth2-proxy, dex, authmiddleware, and completed rotator jobs.
 
 ## Create and Test Workspaces
 
 ```bash
-make apply-sample-routing WS_USER=<your-user>
+make apply-sample-oidc
 kubectl get workspaces -n default
 kubectl wait --for=condition=Available workspaces --all -n default --timeout=300s
 ```
@@ -102,11 +139,6 @@ make bearer-token WS_NAME=<workspace-name>
 Should return a URL with a JWT token. Open in browser — the bearer auth middleware creates
 a session JWT and sets a cookie, then routes through Traefik to the workspace.
 
-Alternatively, test via port-forward:
-```bash
-make port-forward
-```
-
 ### Verify GitHub OAuth Flow
 
 Access a workspace URL directly in browser (without bearer token):
@@ -117,14 +149,14 @@ Access a workspace URL directly in browser (without bearer token):
 
 Check that the rotator CronJob is running and the secret has multiple keys:
 ```bash
-kubectl get cronjob -n jupyter-k8s-system
-kubectl get secret authmiddleware-secrets -n jupyter-k8s-system -o jsonpath='{.data}' | jq 'keys'
+kubectl get cronjob -n jupyter-k8s-router
+kubectl get secret authmiddleware-secrets -n jupyter-k8s-router -o jsonpath='{.data}' | jq 'keys'
 ```
 
 ## Cleanup
 
 ```bash
-make delete-sample-routing
+make delete-sample-oidc
 ```
 
 No errors should appear in controller logs.
@@ -138,3 +170,4 @@ No errors should appear in controller logs.
 | OAuth redirect fails | GitHub OAuth app callback URL mismatch with domain, or Dex configmap has wrong issuer URL |
 | Bearer token returns 403 | `enableBearerAuth` not set to true, or RBAC missing for `bearertokenreviews` |
 | Rotator job fails | ServiceAccount missing RBAC to update the JWT secret |
+| Resource ownership error on deploy | Helm release name mismatch — see "Helm release name conflict" above |
