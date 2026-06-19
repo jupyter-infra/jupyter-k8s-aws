@@ -41,6 +41,20 @@ spec:
     stsPreload: true
     frameDeny: true
 ---
+{{- if .Values.webApp.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: web-app-csp
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: web-app
+    component: security
+spec:
+  headers:
+    contentSecurityPolicy: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
+{{- end }}
+---
 {{- if .Values.authmiddleware.enabled }}
 apiVersion: traefik.io/v1alpha1
 kind: Middleware

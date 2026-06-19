@@ -15,6 +15,11 @@ spec:
     - match: Host(`{{ .Values.domain }}`) && PathPrefix(`/api/`) && HeaderRegexp(`Cookie`, `{{ .Values.webApp.session.cookieName }}=`)
       priority: 15
       kind: Rule
+      middlewares:
+        - name: auth-headers
+          namespace: {{ .Values.namespace }}
+        - name: web-app-csp
+          namespace: {{ .Values.namespace }}
       services:
         - name: web-app
           port: 8090
@@ -38,6 +43,10 @@ spec:
       priority: 10
       kind: Rule
       middlewares:
+        - name: auth-headers
+          namespace: {{ .Values.namespace }}
+        - name: web-app-csp
+          namespace: {{ .Values.namespace }}
         - name: oauth-auth-redirect
           namespace: {{ .Values.namespace }}
       services:
@@ -63,6 +72,10 @@ spec:
       priority: 5
       kind: Rule
       middlewares:
+        - name: auth-headers
+          namespace: {{ .Values.namespace }}
+        - name: web-app-csp
+          namespace: {{ .Values.namespace }}
         - name: oauth-auth-redirect
           namespace: {{ .Values.namespace }}
       services:
