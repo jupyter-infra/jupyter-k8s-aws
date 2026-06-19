@@ -56,6 +56,9 @@ var _ = Describe("Access Strategy", func() {
 			Expect(content).To(ContainSubstring("namespace: jupyter-k8s-system"))
 			Expect(content).To(ContainSubstring("test.example.com"))
 			Expect(content).To(ContainSubstring("oauth-auth-redirect"))
+			Expect(content).To(ContainSubstring(
+				"applicationBasePathTemplate: \"/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/\""),
+				"oauth strategy should set applicationBasePathTemplate for idle-detection path resolution")
 		})
 
 		It("should not render the bearer access strategy", func() {
@@ -117,6 +120,9 @@ var _ = Describe("Access Strategy", func() {
 			Expect(content).To(ContainSubstring("createConnectionHandler: \"k8s-native\""))
 			Expect(content).To(ContainSubstring("bearerAuthURLTemplate"))
 			Expect(content).To(ContainSubstring("test.example.com"))
+			Expect(content).To(ContainSubstring(
+				"applicationBasePathTemplate: \"/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/\""),
+				"bearer strategy should set applicationBasePathTemplate for idle-detection path resolution")
 		})
 	})
 
