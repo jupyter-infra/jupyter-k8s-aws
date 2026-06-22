@@ -6,7 +6,7 @@ metadata:
 spec:
   forwardAuth:
     address: http://oauth2-proxy.{{ .Values.namespace }}:4180
-    trustForwardHeader: true
+    trustForwardHeader: false
     addAuthCookiesToResponse:
       - "{{ $.Values.authmiddleware.cookieName }}"
     authResponseHeaders:
@@ -67,7 +67,7 @@ metadata:
 spec:
   forwardAuth:
     address: "http://authmiddleware.{{ .Values.namespace }}:8080/auth"
-    trustForwardHeader: true
+    trustForwardHeader: false
     addAuthCookiesToResponse:
       - "{{ $.Values.authmiddleware.cookieName }}"
     authRequestHeaders:
@@ -92,7 +92,7 @@ metadata:
 spec:
   forwardAuth:
     address: "http://authmiddleware.{{ .Values.namespace }}:8080/verify"
-    trustForwardHeader: true
+    trustForwardHeader: false
     authRequestHeaders:
       - "Cookie"
       - "X-Forwarded-Uri"
@@ -111,7 +111,7 @@ metadata:
 spec:
   forwardAuth:
     address: "http://authmiddleware.{{ .Values.namespace }}:8080/bearer-auth"
-    trustForwardHeader: true
+    trustForwardHeader: false
     addAuthCookiesToResponse:
       - "{{ $.Values.authmiddleware.cookieName }}"
     authRequestHeaders:

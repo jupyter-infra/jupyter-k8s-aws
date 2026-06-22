@@ -28,7 +28,7 @@ metadata:
 spec:
   forwardAuth:
     address: "http://authmiddleware.{{ .Values.namespace }}:8080/bearer-auth"
-    trustForwardHeader: true
+    trustForwardHeader: false
     addAuthCookiesToResponse:
       - "{{ $.Values.clusterWebUI.auth.cookieName }}"
     authRequestHeaders:
@@ -48,7 +48,7 @@ metadata:
 spec:
   forwardAuth:
     address: "http://authmiddleware.{{ .Values.namespace }}:8080/verify"
-    trustForwardHeader: true
+    trustForwardHeader: false
     addAuthCookiesToResponse:
       - "{{ $.Values.clusterWebUI.auth.cookieName }}"
     authRequestHeaders:
