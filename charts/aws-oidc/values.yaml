@@ -64,7 +64,7 @@ traefik:
   # Traefik deployment image name
   imageName: traefik
   # Traefik deployment image tag
-  imageTag: v3.6
+  imageTag: v3.7.5
   # Number of traefik replicas
   replicas: 1
   # Redirect HTTP to HTTPS
@@ -179,7 +179,7 @@ githubRbac:
 oauth2Proxy:
   # OAuth2 Proxy image settings
   repository: quay.io/oauth2-proxy/oauth2-proxy
-  imageTag: v7.15.2
+  imageTag: v7.15.3
   # Node selector for oauth2-proxy pods (overrides chart-level nodeSelector)
   nodeSelector: {}
   # Tolerations for oauth2-proxy pods (overrides chart-level tolerations)
@@ -226,7 +226,7 @@ webApp:
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-ui
-  imageTag: v0.1.1
+  imageTag: v0.1.2
   # Kubernetes namespace where workspaces are created and managed
   namespace: default
   resources:
@@ -275,7 +275,7 @@ authmiddleware:
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-authmiddleware
-  imageTag: v0.1.0-rc.2
+  imageTag: v0.1.2
   # Resource limits and requests
   resources:
     limits:
@@ -327,7 +327,7 @@ rotator:
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-rotator
-  imageTag: v0.1.0-rc.2
+  imageTag: v0.1.2
   # Rotation interval (how often to rotate keys)
   # Must be parseable as a duration (e.g., "15m", "1h")
   rotationInterval: "15m"
