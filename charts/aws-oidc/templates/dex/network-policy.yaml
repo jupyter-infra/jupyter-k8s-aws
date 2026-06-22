@@ -27,6 +27,21 @@ spec:
     ports:
     - port: 5556
       protocol: TCP
+  # Allow in-cluster wait-for-dex health gate from oauth2-proxy/authmiddleware init containers
+  - from:
+    - podSelector:
+        matchExpressions:
+        - key: app
+          operator: In
+          values:
+          - oauth2-proxy
+          - authmiddleware
+      namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.namespace }}
+    ports:
+    - port: 5556
+      protocol: TCP
   egress:
   # Allow DNS resolution
   - ports:
@@ -34,9 +49,20 @@ spec:
       protocol: UDP
     - port: 53
       protocol: TCP
-  # Allow HTTPS outbound connections
+  # Allow HTTPS outbound connections (GitHub OAuth, Kubernetes API server)
   - ports:
     - port: 443
       protocol: TCP
-    - port: 80
+  # Allow the wait-for-traefik init gate to reach traefik-healthcheck:9000/ping.
+  # This is plaintext, so scope it to the traefik router pods in this namespace.
+  - to:
+    - podSelector:
+        matchLabels:
+          app: traefik
+          component: router
+      namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.namespace }}
+    ports:
+    - port: 9000
       protocol: TCP

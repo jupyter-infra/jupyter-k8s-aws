@@ -17,6 +17,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"sigs.k8s.io/yaml"
 )
 
@@ -243,6 +244,40 @@ var _ = Describe("Web App", func() {
 			Expect(found).To(BeTrue(), "SESSION_NEAR_EXPIRY_THRESHOLD_SECS not found")
 			// 8h = 28800s, 25% = 7200
 			Expect(val).To(Equal("7200"))
+		})
+	})
+
+	// Shared behind-traefik invariants (policyTypes, traefik-only ingress, DNS
+	// egress) are covered by the network-policy consistency suite. This asserts
+	// the web-app-specific egress need: :443 for the K8s API server and Dex via
+	// the public domain (see issue #50).
+	Context("network policy (web-app specific egress)", func() {
+		var np networkingv1.NetworkPolicy
+
+		BeforeEach(func() {
+			outputDir := GinkgoT().TempDir()
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+
+			args := append(requiredArgs(),
+				"--set", "webApp.enabled=true",
+			)
+			helmTemplate(chartDir, outputDir, args...)
+			templatesDir := filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
+
+			data, err := os.ReadFile(filepath.Join(templatesDir, "web-app/network-policy.yaml"))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(yaml.Unmarshal(data, &np)).To(Succeed())
+		})
+
+		It("should allow :443 egress for the API server and Dex", func() {
+			Expect(egressPorts(np)).To(HaveKey(443), "web-app needs :443 egress for the API server and Dex")
+		})
+
+		// web-app reaches the API server and Dex over https only; there is no
+		// plaintext :80 egress, so the rule should not be present.
+		It("should not allow unused :80 plaintext egress", func() {
+			Expect(egressPorts(np)).NotTo(HaveKey(80), "web-app makes no plaintext :80 egress; the rule should not be present")
 		})
 	})
 

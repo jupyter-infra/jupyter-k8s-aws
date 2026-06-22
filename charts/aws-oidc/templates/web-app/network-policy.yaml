@@ -1,16 +1,17 @@
+{{- if .Values.webApp.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: oauth2-proxy-network-policy
+  name: web-app-network-policy
   namespace: {{ .Values.namespace }}
   labels:
-    app: oauth2-proxy
-    component: auth
+    app: web-app
+    component: web-app
 spec:
   podSelector:
     matchLabels:
-      app: oauth2-proxy
-      component: auth
+      app: web-app
+      component: web-app
   policyTypes:
   - Ingress
   - Egress
@@ -21,12 +22,11 @@ spec:
         matchLabels:
           app: traefik
           component: router
-      # Ensure the traffic only comes from pods in the same namespace
       namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: {{ .Values.namespace }}
     ports:
-    - port: 4180
+    - port: 8090
       protocol: TCP
   egress:
   # Allow DNS resolution
@@ -35,20 +35,9 @@ spec:
       protocol: UDP
     - port: 53
       protocol: TCP
-  # Allow HTTPS outbound connections (Dex via the public domain)
+  # Allow HTTPS outbound connections
+  # (Kubernetes API server via KUBERNETES_SERVICE_HOST:443 and Dex via the public domain)
   - ports:
     - port: 443
       protocol: TCP
-  # Allow the wait-for-dex init gate to reach dex:5556/dex/healthz.
-  # This is plaintext, so scope it to the dex pods in this namespace.
-  - to:
-    - podSelector:
-        matchLabels:
-          app: dex
-          component: oauth
-      namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: {{ .Values.namespace }}
-    ports:
-    - port: 5556
-      protocol: TCP
+{{- end }}
