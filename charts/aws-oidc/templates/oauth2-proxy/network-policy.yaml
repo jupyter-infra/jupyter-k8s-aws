@@ -28,17 +28,27 @@ spec:
     ports:
     - port: 4180
       protocol: TCP
+  egress:
   # Allow DNS resolution
   - ports:
     - port: 53
       protocol: UDP
     - port: 53
       protocol: TCP
-  # Allow HTTPS outbound connections (for connecting to Dex)
+  # Allow HTTPS outbound connections (Dex via the public domain)
   - ports:
     - port: 443
       protocol: TCP
+  # Allow the wait-for-dex init gate to reach dex:5556/dex/healthz.
+  # This is plaintext, so scope it to the dex pods in this namespace.
+  - to:
+    - podSelector:
+        matchLabels:
+          app: dex
+          component: oauth
+      namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.namespace }}
+    ports:
     - port: 5556
-      protocol: TCP
-    - port: 80
       protocol: TCP

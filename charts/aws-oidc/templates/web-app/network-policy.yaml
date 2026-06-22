@@ -1,17 +1,17 @@
-{{- if .Values.authmiddleware.enabled }}
+{{- if .Values.webApp.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: authmiddleware-network-policy
+  name: web-app-network-policy
   namespace: {{ .Values.namespace }}
   labels:
-    app: authmiddleware
-    component: auth
+    app: web-app
+    component: web-app
 spec:
   podSelector:
     matchLabels:
-      app: authmiddleware
-      component: auth
+      app: web-app
+      component: web-app
   policyTypes:
   - Ingress
   - Egress
@@ -26,7 +26,7 @@ spec:
         matchLabels:
           kubernetes.io/metadata.name: {{ .Values.namespace }}
     ports:
-    - port: 8080
+    - port: 8090
       protocol: TCP
   egress:
   # Allow DNS resolution
@@ -35,9 +35,8 @@ spec:
       protocol: UDP
     - port: 53
       protocol: TCP
-  # Allow HTTPS outbound connections. authmiddleware reaches the Kubernetes
-  # API server via the in-cluster kubernetes.default service (rest.InClusterConfig
-  # → KUBERNETES_SERVICE_HOST:KUBERNETES_SERVICE_PORT), which is :443 on EKS.
+  # Allow HTTPS outbound connections
+  # (Kubernetes API server via KUBERNETES_SERVICE_HOST:443 and Dex via the public domain)
   - ports:
     - port: 443
       protocol: TCP
