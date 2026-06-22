@@ -59,6 +59,35 @@ var _ = Describe("Auth Middleware", func() {
 			Expect(egressPorts(np)).To(HaveKey(443), "authmiddleware needs :443 egress for the in-cluster API server")
 		})
 
+		// authmiddleware has the same wait-for-dex initContainer as oauth2-proxy:
+		// it probes http://dex.<ns>:5556/dex/healthz. That port is plaintext, so it
+		// must be scoped to the dex pods in this namespace rather than open egress.
+		It("should scope :5556 egress to dex pods in this namespace", func() {
+			var scoped bool
+			for _, rule := range np.Spec.Egress {
+				targets5556 := false
+				for _, p := range rule.Ports {
+					if p.Port != nil && p.Port.IntValue() == 5556 {
+						targets5556 = true
+					}
+				}
+				if !targets5556 {
+					continue
+				}
+				Expect(rule.To).NotTo(BeEmpty(), ":5556 egress must not be open to all destinations")
+				for _, peer := range rule.To {
+					if peer.PodSelector != nil &&
+						peer.PodSelector.MatchLabels["app"] == "dex" &&
+						peer.NamespaceSelector != nil &&
+						peer.NamespaceSelector.MatchLabels["kubernetes.io/metadata.name"] != "" {
+						scoped = true
+					}
+				}
+			}
+			Expect(scoped).To(BeTrue(),
+				":5556 egress should target dex pods, namespace-scoped")
+		})
+
 		// :80 plaintext egress was unused boilerplate (issuer/redirect are https,
 		// upstream is static://); dropping it removes needless attack surface.
 		It("should not allow unused :80 plaintext egress", func() {
