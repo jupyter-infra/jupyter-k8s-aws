@@ -6,81 +6,22 @@ Distributed under the terms of the MIT license
 package aws_oidc_test
 
 import (
-	"os"
 	"path/filepath"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/yaml"
 )
 
-// egressPorts collects every port allowed across all egress rules of a policy.
-func egressPorts(np networkingv1.NetworkPolicy) map[int]bool {
-	ports := map[int]bool{}
-	for _, rule := range np.Spec.Egress {
-		for _, p := range rule.Ports {
-			if p.Port != nil {
-				ports[p.Port.IntValue()] = true
-			}
-		}
-	}
-	return ports
-}
-
-// containsAll reports whether haystack contains every needle.
-func containsAll(haystack []string, needles ...string) bool {
-	set := map[string]bool{}
-	for _, h := range haystack {
-		set[h] = true
-	}
-	for _, n := range needles {
-		if !set[n] {
-			return false
-		}
-	}
-	return true
-}
-
 var _ = Describe("Dex", func() {
-	var rootDir string
-
-	BeforeEach(func() {
-		var err error
-		rootDir, err = filepath.Abs("../../..")
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	requiredArgs := func() []string {
-		return []string{
-			"--set", "domain=test.example.com",
-			"--set", "certManager.email=admin@example.com",
-			"--set", "storageClass.efs.parameters.fileSystemId=fs-000",
-			"--set", "github.clientId=cid",
-			"--set", "github.clientSecret=csec",
-			"--set", "github.orgs[0].name=org",
-			"--set", "github.orgs[0].teams[0]=t",
-			"--set", "githubRbac.orgs[0].name=org",
-			"--set", "githubRbac.orgs[0].teams[0]=t",
-			"--set", "oauth2Proxy.cookieSecret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-		}
-	}
-
 	Context("network policy", func() {
 		var np networkingv1.NetworkPolicy
 
 		BeforeEach(func() {
-			outputDir := GinkgoT().TempDir()
-			chartDir := GinkgoT().TempDir()
-			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
-
-			helmTemplate(chartDir, outputDir, requiredArgs()...)
-			templatesDir := filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
-
-			data, err := os.ReadFile(filepath.Join(templatesDir, "dex/network-policy.yaml"))
+			rootDir, err := filepath.Abs("../../..")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(yaml.Unmarshal(data, &np)).To(Succeed())
+			np = renderNetworkPolicy(rootDir, "dex/network-policy.yaml")
 		})
 
 		// Regression guard for #49: both oauth2-proxy and authmiddleware run a
@@ -140,29 +81,7 @@ var _ = Describe("Dex", func() {
 		// :9000 is plaintext, so it must be scoped to the traefik router pods in
 		// this namespace rather than allowed to any destination.
 		It("should scope :9000 egress to traefik router pods in this namespace", func() {
-			var scoped bool
-			for _, rule := range np.Spec.Egress {
-				targets9000 := false
-				for _, p := range rule.Ports {
-					if p.Port != nil && p.Port.IntValue() == 9000 {
-						targets9000 = true
-					}
-				}
-				if !targets9000 {
-					continue
-				}
-				Expect(rule.To).NotTo(BeEmpty(), ":9000 egress must not be open to all destinations")
-				for _, peer := range rule.To {
-					if peer.PodSelector != nil &&
-						peer.PodSelector.MatchLabels["app"] == "traefik" &&
-						peer.PodSelector.MatchLabels["component"] == "router" &&
-						peer.NamespaceSelector != nil &&
-						peer.NamespaceSelector.MatchLabels["kubernetes.io/metadata.name"] != "" {
-						scoped = true
-					}
-				}
-			}
-			Expect(scoped).To(BeTrue(),
+			Expect(egressScopedToPodOnPort(np, 9000, "traefik")).To(BeTrue(),
 				":9000 egress should target traefik router pods, namespace-scoped")
 		})
 
