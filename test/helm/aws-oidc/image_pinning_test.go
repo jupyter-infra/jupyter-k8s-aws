@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -112,3 +113,71 @@ func isUnpinned(image string) bool {
 	// Explicit :latest
 	return strings.HasSuffix(image, ":latest")
 }
+
+var _ = Describe("In-house Image Version Governance", func() {
+	inHouseImages := []string{
+		"jupyter-k8s-ui",
+		"jupyter-k8s-authmiddleware",
+		"jupyter-k8s-rotator",
+	}
+
+	// Images released together from the jupyter-k8s repo.
+	coreImages := []string{
+		"jupyter-k8s-authmiddleware",
+		"jupyter-k8s-rotator",
+	}
+
+	semverRegex := regexp.MustCompile(`^v\d+\.\d+\.\d+$`)
+
+	extractTag := func(valuesContent, imageName string) string {
+		re := regexp.MustCompile(`imageName:\s*` + regexp.QuoteMeta(imageName) + `\s*\n\s*imageTag:\s*(\S+)`)
+		matches := re.FindStringSubmatch(valuesContent)
+		ExpectWithOffset(1, matches).To(HaveLen(2),
+			fmt.Sprintf("Could not find imageTag for %s in values.yaml", imageName))
+		return matches[1]
+	}
+
+	It("should use release semver tags (vX.Y.Z) for all in-house images", func() {
+		rootDir, err := filepath.Abs("../../..")
+		Expect(err).NotTo(HaveOccurred())
+
+		data, err := os.ReadFile(filepath.Join(rootDir, "charts/aws-oidc/values.yaml"))
+		Expect(err).NotTo(HaveOccurred())
+		valuesContent := string(data)
+
+		var violations []string
+		for _, img := range inHouseImages {
+			tag := extractTag(valuesContent, img)
+			if !semverRegex.MatchString(tag) {
+				violations = append(violations,
+					fmt.Sprintf("  %s: %s (expected vX.Y.Z)", img, tag))
+			}
+		}
+		Expect(violations).To(BeEmpty(),
+			"In-house images must use release semver tags (no rc/alpha/beta):\n%s",
+			strings.Join(violations, "\n"))
+	})
+
+	It("should use the same version for authmiddleware and rotator", func() {
+		rootDir, err := filepath.Abs("../../..")
+		Expect(err).NotTo(HaveOccurred())
+
+		data, err := os.ReadFile(filepath.Join(rootDir, "charts/aws-oidc/values.yaml"))
+		Expect(err).NotTo(HaveOccurred())
+		valuesContent := string(data)
+
+		reference := extractTag(valuesContent, coreImages[0])
+		var mismatches []string
+		for _, img := range coreImages[1:] {
+			tag := extractTag(valuesContent, img)
+			if tag != reference {
+				mismatches = append(mismatches,
+					fmt.Sprintf("  %s: %s (expected %s)", img, tag, reference))
+			}
+		}
+		Expect(mismatches).To(BeEmpty(),
+			"authmiddleware and rotator are released together and must use the same tag. "+
+				"Reference (%s: %s), mismatches:\n%s",
+			coreImages[0], reference, strings.Join(mismatches, "\n"))
+	})
+})
