@@ -64,7 +64,7 @@ traefik:
   # Traefik deployment image name
   imageName: traefik
   # Traefik deployment image tag
-  imageTag: v3.6
+  imageTag: v3.7.5
   # Number of traefik replicas
   replicas: 1
   # Redirect HTTP to HTTPS
@@ -179,7 +179,7 @@ githubRbac:
 oauth2Proxy:
   # OAuth2 Proxy image settings
   repository: quay.io/oauth2-proxy/oauth2-proxy
-  imageTag: v7.15.2
+  imageTag: v7.15.3
   # Node selector for oauth2-proxy pods (overrides chart-level nodeSelector)
   nodeSelector: {}
   # Tolerations for oauth2-proxy pods (overrides chart-level tolerations)
