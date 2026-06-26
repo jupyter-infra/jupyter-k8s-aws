@@ -1,0 +1,13 @@
+name: "E2E canary (weekly)"
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch: {}
+
+jobs:
+  canary:
+    uses: ./.github/workflows/e2e.yml
+    permissions:
+      id-token: write
+      contents: read

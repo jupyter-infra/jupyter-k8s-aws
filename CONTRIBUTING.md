@@ -44,6 +44,53 @@ Copy `.env.example` to `.env` and fill in your AWS cluster configuration.
 | `make image-build`     | Build aws-plugin container image locally         |
 | `make deps`            | Download and tidy Go dependencies                |
 
+## Testing against AWS
+
+Deploy targets (`deploy-aws-oidc`, `deploy-aws-hyperpod`) use `--reuse-values`
+to preserve the Helm release state that [jupyter-deploy](https://github.com/jupyter-infra/jupyter-deploy)
+terraform initially configured (domain, OAuth, storage, etc.). Contributors only
+need cluster connection info in `.env`.
+
+You will need:
+
+- [jupyter-deploy](https://github.com/jupyter-infra/jupyter-deploy) CLI installed
+- A deployed `tf-aws-eks-oidc` project (creates the EKS cluster + full chart config)
+
+```bash
+cp .env.example .env
+# Edit .env with your cluster's AWS_REGION and EKS_CLUSTER_NAME
+make setup-aws
+```
+
+### Iterate on charts
+
+```bash
+make deploy-aws-oidc                                          # upgrade with existing values
+make deploy-aws-oidc HELM_EXTRA_ARGS="--set webApp.imageTag=dev"  # override specific values
+```
+
+### Iterate on the controller
+
+```bash
+make deploy-controller                  # deploy without aws-plugin sidecar
+make deploy-controller-with-plugin      # deploy with aws-plugin sidecar
+```
+
+### Teardown
+
+Run `jd down` in your jupyter-deploy project to destroy the cluster and all
+resources. The next `jd up` re-creates everything from scratch.
+
+### CI E2E tests
+
+Chart changes pushed to `main` (under `charts/`) automatically trigger an E2E
+workflow that upgrades the chart on a persistent EKS cluster in a dedicated CI
+AWS account. The cluster is provisioned and maintained by project maintainers
+using [`jupyter-deploy-tf-aws-eks-oidc`](https://github.com/jupyter-infra/jupyter-deploy).
+The same check gates chart releases — a chart cannot be staged to GHCR unless
+e2e passes. A weekly canary run detects cluster drift independently of code
+changes. See [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml).
+
 ## Before Submitting a PR
 
 ```bash
