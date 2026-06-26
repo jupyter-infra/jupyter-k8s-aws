@@ -59,7 +59,19 @@ You will need:
 ```bash
 cp .env.example .env
 # Edit .env with your cluster's AWS_REGION and EKS_CLUSTER_NAME
+
+# Option A: via make
 make setup-aws
+
+# Option B: via jd
+jd cluster login   # from your jd project directory
+```
+
+### Create test workspaces
+
+```bash
+kubectl apply -k samples/oidc   # create sample workspaces
+kubectl delete -k samples/oidc  # remove them
 ```
 
 ### Iterate on charts
