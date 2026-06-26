@@ -6,8 +6,20 @@ on:
     paths: ['charts/**']
   pull_request:
     paths: ['charts/**']
-  workflow_call: {}
-  workflow_dispatch: {}
+  workflow_call:
+    inputs:
+      environment:
+        description: "GitHub environment to use (e2e or e2e-canary)"
+        required: false
+        type: string
+        default: e2e
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "GitHub environment to use (e2e or e2e-canary)"
+        required: false
+        type: string
+        default: e2e
 
 permissions:
   id-token: write
@@ -22,7 +34,7 @@ jobs:
     name: "Chart upgrade"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: e2e
+    environment: ${{ inputs.environment || 'e2e' }}
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4

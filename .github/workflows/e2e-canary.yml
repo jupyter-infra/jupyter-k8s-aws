@@ -8,6 +8,8 @@ on:
 jobs:
   canary:
     uses: ./.github/workflows/e2e.yml
+    with:
+      environment: e2e-canary
     permissions:
       id-token: write
       contents: read
