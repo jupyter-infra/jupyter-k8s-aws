@@ -46,10 +46,10 @@ Copy `.env.example` to `.env` and fill in your AWS cluster configuration.
 
 ## Testing against AWS
 
-Deploy targets (`deploy-aws-oidc`, `deploy-aws-hyperpod`) use `--reuse-values`
-to preserve the Helm release state that [jupyter-deploy](https://github.com/jupyter-infra/jupyter-deploy)
-terraform initially configured (domain, OAuth, storage, etc.). Contributors only
-need cluster connection info in `.env`.
+`deploy-aws-oidc` uses `--reuse-values` to preserve the Helm release state that
+[jupyter-deploy](https://github.com/jupyter-infra/jupyter-deploy) terraform initially
+configured (domain, OAuth, storage, etc.). Contributors only need cluster connection
+info in `.env`.
 
 You will need:
 
