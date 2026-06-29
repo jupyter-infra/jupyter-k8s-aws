@@ -1,4 +1,4 @@
-name: "E2E canary (weekly)"
+name: "E2E EKS OIDC canary (weekly)"
 
 on:
   schedule:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   canary:
-    uses: ./.github/workflows/e2e.yml
+    uses: ./.github/workflows/e2e-eks-oidc.yml
     with:
       environment: e2e-canary
     permissions:

@@ -101,7 +101,7 @@ AWS account. The cluster is provisioned and maintained by project maintainers
 using [`jupyter-deploy-tf-aws-eks-oidc`](https://github.com/jupyter-infra/jupyter-deploy).
 The same check gates chart releases — a chart cannot be staged to GHCR unless
 e2e passes. A weekly canary run detects cluster drift independently of code
-changes. See [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml).
+changes. See [`.github/workflows/e2e-eks-oidc.yml`](.github/workflows/e2e-eks-oidc.yml).
 
 ## Before Submitting a PR
 

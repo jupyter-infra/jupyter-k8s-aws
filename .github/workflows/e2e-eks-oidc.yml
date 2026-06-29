@@ -1,9 +1,9 @@
-name: E2E
+name: "E2E EKS OIDC"
 
 on:
   push:
     branches: [main]
-    paths: ['charts/**']
+    paths: ['charts/aws-oidc/**']
   workflow_call:
     inputs:
       environment:
