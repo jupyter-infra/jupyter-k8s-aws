@@ -4,8 +4,6 @@ on:
   push:
     branches: [main]
     paths: ['charts/**']
-  pull_request:
-    paths: ['charts/**']
   workflow_call:
     inputs:
       environment:
@@ -13,6 +11,11 @@ on:
         required: false
         type: string
         default: e2e
+      ref:
+        description: "Git ref to checkout (e.g. refs/pull/55/merge for a specific PR)"
+        required: false
+        type: string
+        default: ""
   workflow_dispatch:
     inputs:
       environment:
@@ -20,13 +23,18 @@ on:
         required: false
         type: string
         default: e2e
+      ref:
+        description: "Git ref to checkout (e.g. refs/pull/55/merge for a specific PR)"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   id-token: write
   contents: read
 
 concurrency:
-  group: e2e-${{ github.event.pull_request.number || github.ref }}
+  group: e2e-${{ inputs.ref || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -37,6 +45,8 @@ jobs:
     environment: ${{ inputs.environment || 'e2e' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
       - uses: azure/setup-helm@v4
 
       - name: Configure AWS credentials
