@@ -32,8 +32,12 @@ CHART_OIDC        := $(CHARTS_DIR)/aws-oidc
 # Path to sibling jupyter-k8s checkout (for controller chart deployment)
 CONTROLLER_DIR ?= ../jupyter-k8s
 
-# Guided deployment
+# Guided deployment (used by helm-lint and helm-test only)
 OAUTH2P_COOKIE_SECRET := $(shell openssl rand -base64 32 | tr -- '+/' '-_')
+
+# Extra Helm arguments for deploy targets (pass overrides on the command line)
+# Example: make deploy-aws-oidc HELM_EXTRA_ARGS="--set authmiddleware.imageTag=dev"
+HELM_EXTRA_ARGS ?=
 
 # AWS configuration
 # Resolution order (highest priority first):
@@ -254,127 +258,37 @@ kubectl-aws: ## Configure kubectl to use remote cluster
 	fi
 
 .PHONY: deploy-aws-oidc
-deploy-aws-oidc: setup-aws ## Deploy aws-oidc chart from .env config
-	@if [ ! -f .env ]; then \
-		echo ".env file not found. Copy .env.example to .env and edit the values."; \
-		echo "Required: OIDC_DOMAIN, LETSENCRYPT_EMAIL, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_ORG_NAME"; \
-		exit 1; \
-	fi
-	@echo "Loading configuration from .env file and deploying..."
+deploy-aws-oidc: setup-aws ## Deploy aws-oidc chart (reuses existing Helm values from JD)
+	@echo "Upgrading aws-oidc chart with --reuse-values..."
+	helm upgrade jupyter-k8s-aws-oidc $(CHART_OIDC) \
+		-n jupyter-k8s-router \
+		--reuse-values \
+		$(HELM_EXTRA_ARGS)
 	@( \
 		set -e; \
-		. ./.env; \
-		rm -rf /tmp/jk8s-aws-oidc; \
-		cp -r $(CHART_OIDC) /tmp/jk8s-aws-oidc; \
-		echo 'Deploying AWS OIDC helm chart'; \
-		HELM_ARGS="--set domain=$$OIDC_DOMAIN \
-			--set certManager.email=$$LETSENCRYPT_EMAIL \
-			--set storageClass.efs.parameters.fileSystemId=$$EFS_ID \
-			--set github.clientId=$$GITHUB_CLIENT_ID \
-			--set github.clientSecret=$$GITHUB_CLIENT_SECRET \
-			--set github.orgs[0].name=$$GITHUB_ORG_NAME \
-			--set github.orgs[0].teams[0]=$$GITHUB_TEAM \
-			--set githubRbac.orgs[0].name=$$GITHUB_ORG_NAME \
-			--set githubRbac.orgs[0].teams[0]=$$GITHUB_TEAM \
-			--set oauth2Proxy.cookieSecret=$(OAUTH2P_COOKIE_SECRET) \
-			--set authmiddleware.repository=$(ECR_REGISTRY) \
-			--set authmiddleware.imageName=$(ECR_REPOSITORY_AUTH) \
-			--set authmiddleware.imageTag=latest \
-			--set authmiddleware.enableBearerAuth=true \
-			--set accessStrategy.createBearer=true \
-			--set rotator.repository=$(ECR_REGISTRY) \
-			--set rotator.imageName=$(ECR_REPOSITORY_ROTATOR) \
-			--set rotator.imageTag=latest"; \
-		HELM_ARGS="$$HELM_ARGS --set accessStrategy.namespace=jupyter-k8s-shared"; \
-		if [ ! -z "$$DEX_OAUTH2_SECRET" ]; then \
-			HELM_ARGS="$$HELM_ARGS --set dex.oauth2ProxyClientSecret=$$DEX_OAUTH2_SECRET"; \
-		fi; \
-		\
-		if [ ! -z "$$DEX_K8S_SECRET" ]; then \
-			HELM_ARGS="$$HELM_ARGS --set dex.kubernetesClientSecret=$$DEX_K8S_SECRET"; \
-		fi; \
-		\
-		if [ "$$WEB_APP_ENABLED" = "true" ]; then \
-			HELM_ARGS="$$HELM_ARGS --set webApp.enabled=true \
-				--set webApp.repository=$(ECR_REGISTRY) \
-				--set webApp.imageName=$(ECR_REPOSITORY_WEB_APP)"; \
-			if [ ! -z "$$WEB_APP_NAMESPACE" ]; then \
-				HELM_ARGS="$$HELM_ARGS --set webApp.namespace=$$WEB_APP_NAMESPACE"; \
-			fi; \
-		fi; \
-		\
-		if [ ! -z "$$KUBECTL_REDIRECT_PORTS" ]; then \
-			IFS=',' read -ra PORTS <<< "$$KUBECTL_REDIRECT_PORTS"; \
-			PORT_INDEX=0; \
-			for PORT in "$${PORTS[@]}"; do \
-				HELM_ARGS="$$HELM_ARGS --set dex.kubernetesClientRedirectPorts[$${PORT_INDEX}]=$${PORT}"; \
-				PORT_INDEX=$$((PORT_INDEX + 1)); \
-			done; \
-		fi; \
-		\
-		helm upgrade --install jupyter-k8s-aws-oidc /tmp/jk8s-aws-oidc \
-			-n jupyter-k8s-router \
-			--create-namespace \
-			$$HELM_ARGS; \
-		\
+		DOMAIN=$$(helm get values jupyter-k8s-aws-oidc -n jupyter-k8s-router -o json | jq -r '.domain'); \
 		$(SHELL) scripts/aws-oidc/generate-client.sh \
 			$(EKS_CLUSTER_NAME) \
-			https://$$OIDC_DOMAIN/dex \
+			https://$$DOMAIN/dex \
 			$(AWS_REGION) \
 			9800 \
 			dist/users-scripts/set-kubeconfig.sh \
 			"$$(kubectl get configmap dex-config -n jupyter-k8s-router -o jsonpath='{.data.config\.yaml}' | awk '/id: kubectl-oidc/{found=1} found && /secret:/{print $$2; exit}')"; \
-		echo "Restarting deployments to use new images..."; \
-		kubectl rollout restart deployment -n jupyter-k8s-router \
-			traefik oauth2-proxy dex authmiddleware; \
-		if [ "$$WEB_APP_ENABLED" = "true" ]; then \
-			kubectl rollout restart deployment -n jupyter-k8s-router web-app; \
-		fi; \
 	)
-	rm -rf /tmp/jk8s-aws-oidc
-	@echo "Bash script for end-users to set their kubeconfig available at: dist/users-scripts"
+	@echo "Restarting deployments to pick up chart changes..."
+	kubectl rollout restart deployment -n jupyter-k8s-router \
+		traefik oauth2-proxy dex authmiddleware
+	-kubectl rollout restart deployment -n jupyter-k8s-router web-app 2>/dev/null || true
+	@echo "Kubectl setup script available at: dist/users-scripts/set-kubeconfig.sh"
 
 .PHONY: deploy-aws-hyperpod
-deploy-aws-hyperpod: setup-aws ## Deploy aws-hyperpod chart from .env config
-	@if [ ! -f .env ]; then \
-		echo ".env file not found. Copy .env.example to .env and edit the values."; \
-		echo "Required: HYPERPOD_DOMAIN, ACM_CERT_ARN"; \
-		exit 1; \
-	fi
-	@echo "Loading configuration from .env file and deploying aws-hyperpod..."
-	@( \
-		set -e; \
-		. ./.env; \
-		HP_DOMAIN=$$HYPERPOD_DOMAIN; \
-		if [ -z "$$HP_DOMAIN" ]; then \
-			echo "HYPERPOD_DOMAIN must be set in .env"; \
-			exit 1; \
-		fi; \
-		echo "Deploying AWS HyperPod helm chart (domain=$$HP_DOMAIN)"; \
-		HELM_ARGS="--set aws.region=$(AWS_REGION) \
-			--set clusterWebUI.enabled=true \
-			--set clusterWebUI.domain=$$HP_DOMAIN \
-			--set clusterWebUI.auth.repository=$(ECR_REGISTRY) \
-			--set clusterWebUI.auth.imageName=$(ECR_REPOSITORY_AUTH) \
-			--set clusterWebUI.rotator.repository=$(ECR_REGISTRY) \
-			--set clusterWebUI.rotator.imageName=$(ECR_REPOSITORY_ROTATOR)"; \
-		if [ -n "$$ACM_CERT_ARN" ]; then \
-			HELM_ARGS="$$HELM_ARGS --set clusterWebUI.awsCertificateArn=$$ACM_CERT_ARN"; \
-		fi; \
-		if [ -n "$$SSM_SIDECAR_REGISTRY" ] && [ -n "$$SSM_SIDECAR_REPO" ] && [ -n "$$SSM_SIDECAR_TAG" ]; then \
-			HELM_ARGS="$$HELM_ARGS --set remoteAccess.enabled=true \
-				--set remoteAccess.ssmSidecarImage.containerRegistry=$$SSM_SIDECAR_REGISTRY \
-				--set remoteAccess.ssmSidecarImage.repository=$$SSM_SIDECAR_REPO \
-				--set remoteAccess.ssmSidecarImage.tag=$$SSM_SIDECAR_TAG"; \
-			if [ -n "$$SSM_MANAGED_NODE_ROLE" ]; then \
-				HELM_ARGS="$$HELM_ARGS --set remoteAccess.ssmManagedNodeRole=$$SSM_MANAGED_NODE_ROLE"; \
-			fi; \
-		fi; \
-		helm upgrade --install aws-hyperpod ./$(CHART_HYPERPOD) \
-			--create-namespace --namespace jupyter-k8s-system \
-			$$HELM_ARGS; \
-	)
-	@echo "Restarting authmiddleware deployment to use new images..."
+deploy-aws-hyperpod: setup-aws ## Deploy aws-hyperpod chart (reuses existing Helm values from JD)
+	@echo "Upgrading aws-hyperpod chart with --reuse-values..."
+	helm upgrade aws-hyperpod $(CHART_HYPERPOD) \
+		-n jupyter-k8s-system \
+		--reuse-values \
+		$(HELM_EXTRA_ARGS)
+	@echo "Restarting authmiddleware deployment to pick up chart changes..."
 	-kubectl rollout restart deployment -n jupyter-k8s-system workspace-auth-middleware 2>/dev/null || true
 
 .PHONY: deploy-controller

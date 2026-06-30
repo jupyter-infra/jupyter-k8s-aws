@@ -1,0 +1,15 @@
+name: "E2E EKS OIDC canary (weekly)"
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch: {}
+
+jobs:
+  canary:
+    uses: ./.github/workflows/e2e-eks-oidc.yml
+    with:
+      environment: e2e-canary
+    permissions:
+      id-token: write
+      contents: read

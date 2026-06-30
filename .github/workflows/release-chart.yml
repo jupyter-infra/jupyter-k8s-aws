@@ -103,6 +103,7 @@ jobs:
   stage-chart:
     name: Stage chart
     needs: [validate, helm-lint, helm-test]
+    if: always() && needs.helm-lint.result == 'success' && needs.helm-test.result == 'success'
     uses: ./.github/workflows/release-stage-chart.yml
     with:
       chart_name: jupyter-k8s-${{ inputs.chart }}

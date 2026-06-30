@@ -1,0 +1,83 @@
+name: "E2E EKS OIDC"
+
+on:
+  push:
+    branches: [main]
+    paths: ['charts/aws-oidc/**']
+  workflow_call:
+    inputs:
+      environment:
+        description: "GitHub environment to use (e2e or e2e-canary)"
+        required: false
+        type: string
+        default: e2e
+      ref:
+        description: "Git ref to checkout (e.g. refs/pull/55/merge for a specific PR)"
+        required: false
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "GitHub environment to use (e2e or e2e-canary)"
+        required: false
+        type: string
+        default: e2e
+      ref:
+        description: "Git ref to checkout (e.g. refs/pull/55/merge for a specific PR)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: e2e-${{ inputs.ref || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    name: "Chart upgrade"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.environment || 'e2e' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: azure/setup-helm@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_E2E_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: aws eks update-kubeconfig --name ${{ vars.EKS_CLUSTER_NAME }} --region ${{ vars.AWS_REGION }}
+
+      - name: Upgrade aws-oidc chart
+        run: |
+          helm upgrade jupyter-k8s-aws-oidc charts/aws-oidc \
+            -n jupyter-k8s-router \
+            --reuse-values \
+            --wait --timeout 5m
+
+      - name: Verify deployments healthy
+        run: |
+          kubectl wait --for=condition=Available deployment \
+            -n jupyter-k8s-router \
+            -l app.kubernetes.io/managed-by=Helm \
+            --timeout=120s
+
+      - name: Verify IngressRoutes exist
+        run: kubectl get ingressroutes -n jupyter-k8s-router -o json | jq -e '.items | length > 0'
+
+      - name: Verify web-app (if deployed)
+        run: |
+          if kubectl get deployment web-app -n jupyter-k8s-router >/dev/null 2>&1; then
+            kubectl wait --for=condition=Available deployment/web-app \
+              -n jupyter-k8s-router --timeout=120s
+          fi
