@@ -63,6 +63,8 @@ ci-e2e-pull oauth_app_num tag="latest" ci_dir=ci_dir:
     REGION=$(PYTHONPATH={{jd_dir}}/scripts uv run --project {{jd_dir}} jd show -o region --text -p {{ci_dir}})
     aws ecr get-login-password --region "$REGION" | {{container_tool}} login --username AWS --password-stdin "$REGISTRY"
     {{container_tool}} pull "$ECR_URL:{{tag}}" || true
+    # Retag as local name so ci-e2e-eks-deploy can reference it
+    {{container_tool}} tag "$ECR_URL:{{tag}}" jupyter-k8s-aws-e2e:latest 2>/dev/null || true
 
 # Build E2E image
 ci-e2e-build cache_from="" ci_dir=ci_dir:
