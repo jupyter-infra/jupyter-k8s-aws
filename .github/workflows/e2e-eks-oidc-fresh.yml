@@ -1,0 +1,315 @@
+name: "E2E EKS OIDC (fresh deploy)"
+
+on:
+  workflow_call:
+    inputs:
+      test-filter:
+        description: "Pytest -k filter (applied to all jobs, empty = all tests)"
+        required: false
+        type: string
+        default: ""
+      skip-deployment:
+        description: "Skip cleanup + deploy, run tests only (project must already be in S3)"
+        required: false
+        type: boolean
+        default: false
+      destroy-after:
+        description: "Destroy the cluster after tests pass"
+        required: false
+        type: boolean
+        default: true
+      ref:
+        description: "Git ref to checkout (e.g. refs/pull/55/merge for a specific PR)"
+        required: false
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      test-filter:
+        description: "Pytest -k filter (applied to all jobs, empty = all tests)"
+        required: false
+        type: string
+        default: ""
+      skip-deployment:
+        description: "Skip cleanup + deploy, run tests only (project must already be in S3)"
+        required: false
+        type: boolean
+        default: false
+      destroy-after:
+        description: "Destroy the cluster after tests pass"
+        required: false
+        type: boolean
+        default: true
+      ref:
+        description: "Git ref to checkout (e.g. refs/pull/55/merge for a specific PR)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: e2e-eks-fresh
+  cancel-in-progress: false
+
+jobs:
+  # --- Build E2E image (runs in parallel with cleanup) ---
+
+  build-image:
+    name: "Build E2E image"
+    uses: ./.github/workflows/e2e-build-image.yml
+    with:
+      ref: ${{ inputs.ref }}
+    permissions:
+      id-token: write
+      contents: read
+
+  # --- Cleanup existing deployment (runs in parallel with build-image) ---
+
+  cleanup-existing:
+    name: "Cleanup existing deployment"
+    if: ${{ !inputs.skip-deployment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: e2e-fresh
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Checkout jupyter-deploy
+        uses: actions/checkout@v4
+        with:
+          repository: jupyter-infra/jupyter-deploy
+          ref: main
+          path: jupyter-deploy
+
+      - uses: ./.github/actions/install-uv
+
+      - uses: ./.github/actions/install-just
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_E2E_FRESH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Install JD dependencies
+        run: cd jupyter-deploy && uv sync --all-packages
+
+      - name: Restore CI project
+        run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci
+
+      - name: Find and take down previous deployment
+        run: JD_DIR=jupyter-deploy just find-takedown-eks 3 sandbox-ci sandbox-e2e
+
+  # --- Deploy ---
+
+  deploy:
+    name: "Deploy from scratch"
+    needs: [build-image, cleanup-existing]
+    if: ${{ !inputs.skip-deployment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: e2e-fresh
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Checkout jupyter-deploy
+        uses: actions/checkout@v4
+        with:
+          repository: jupyter-infra/jupyter-deploy
+          ref: main
+          path: jupyter-deploy
+
+      - uses: ./.github/actions/install-uv
+
+      - uses: ./.github/actions/install-just
+        id: install-just
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_E2E_FRESH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-duration-seconds: 7200
+
+      - name: Install JD dependencies
+        run: cd jupyter-deploy && uv sync --all-packages
+
+      - name: Restore CI project
+        run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci
+
+      - name: Generate .env
+        run: >-
+          JD_DIR=jupyter-deploy just env-setup-eks "" sandbox-ci 3
+          "org=jupyter-infra,team=kube2-access,rbac-team=kube2-access,admin-roles=[\"Admin\",\"jupyter-k8s-aws-ci-e2e-fresh\"]"
+
+      - name: Import auth state
+        run: JD_DIR=jupyter-deploy just auth-import sandbox-ci
+
+      - name: Pull pre-built E2E image
+        run: JD_DIR=jupyter-deploy just ci-e2e-pull 3 ${{ needs.build-image.outputs.ecr-tag }} sandbox-ci
+
+      - name: Deploy (jd init / config / up)
+        id: deploy
+        run: JD_DIR=jupyter-deploy just ci-e2e-eks-deploy sandbox-e2e sandbox-ci
+
+      - name: Upgrade aws-oidc chart from branch
+        if: success()
+        run: |
+          CLUSTER=$(cd sandbox-e2e && uv run --project ../jupyter-deploy jd show -o cluster_name --text)
+          aws eks update-kubeconfig --name "$CLUSTER" --region ${{ vars.AWS_REGION }}
+          helm upgrade jupyter-k8s-aws-oidc charts/aws-oidc \
+            -n jupyter-k8s-router \
+            --reuse-values \
+            --wait --timeout 5m
+
+      - name: Verify deployment
+        if: success()
+        run: >-
+          JD_DIR=jupyter-deploy just test-e2e-eks-oidc sandbox-e2e "test_deployment"
+          "full-deploy=true,skip-sync=true,ci-dir=sandbox-ci"
+
+      - name: Export auth state
+        if: always() && steps.install-just.outcome == 'success'
+        run: JD_DIR=jupyter-deploy just auth-export sandbox-ci
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-deploy
+          path: test-results/
+          if-no-files-found: ignore
+
+      - name: Upload test results to S3
+        if: failure()
+        continue-on-error: true
+        run: JD_DIR=jupyter-deploy just ci-upload-test-results 3 sandbox-ci
+
+  # --- Gate ---
+
+  deploy-gate:
+    name: "Deploy gate"
+    needs: [build-image, cleanup-existing, deploy]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Check deploy result
+        run: |
+          if [ "${{ inputs.skip-deployment }}" = "true" ]; then
+            echo "Deployment skipped — proceeding to tests"
+          elif [ "${{ needs.deploy.result }}" = "success" ]; then
+            echo "Deployment succeeded — proceeding to tests"
+          else
+            echo "Deployment failed or was cancelled — aborting test chain"
+            exit 1
+          fi
+
+  # --- Test chain ---
+
+  test-non-mutating:
+    name: "Non-mutating tests"
+    needs: [build-image, deploy-gate]
+    uses: ./.github/workflows/e2e-eks-oidc-job.yml
+    with:
+      test-filter: ${{ inputs.test-filter }}
+      ref: ${{ inputs.ref }}
+      ecr-tag: ${{ needs.build-image.outputs.ecr-tag }}
+      timeout-minutes: 120
+    permissions:
+      id-token: write
+      contents: read
+
+  test-mutating:
+    name: "Mutating tests"
+    needs: [build-image, test-non-mutating]
+    uses: ./.github/workflows/e2e-eks-oidc-job.yml
+    with:
+      test-filter: ${{ inputs.test-filter }}
+      ref: ${{ inputs.ref }}
+      ecr-tag: ${{ needs.build-image.outputs.ecr-tag }}
+      marker: mutating
+      mutate: true
+      timeout-minutes: 60
+    permissions:
+      id-token: write
+      contents: read
+
+  # --- Cleanup ---
+
+  cleanup:
+    name: "Cleanup: destroy cluster"
+    needs: [test-non-mutating, test-mutating]
+    if: always() && inputs.destroy-after
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    environment: e2e-fresh
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Checkout jupyter-deploy
+        uses: actions/checkout@v4
+        with:
+          repository: jupyter-infra/jupyter-deploy
+          ref: main
+          path: jupyter-deploy
+
+      - uses: ./.github/actions/install-uv
+
+      - uses: ./.github/actions/install-just
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_E2E_FRESH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-duration-seconds: 7200
+
+      - name: Install JD dependencies
+        run: cd jupyter-deploy && uv sync --all-packages
+
+      - name: Restore CI project
+        run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci
+
+      - name: Restore EKS project
+        run: JD_DIR=jupyter-deploy just ci-restore-eks 3 sandbox-ci sandbox-e2e
+
+      - name: Destroy cluster
+        run: JD_DIR=jupyter-deploy just destroy-fresh sandbox-e2e

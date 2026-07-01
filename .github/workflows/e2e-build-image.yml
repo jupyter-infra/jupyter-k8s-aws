@@ -1,0 +1,70 @@
+name: "Build E2E image"
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+        default: ""
+    outputs:
+      ecr-tag:
+        description: "ECR image tag for test jobs to pull"
+        value: ${{ jobs.build.outputs.ecr-tag }}
+
+jobs:
+  build:
+    name: "Build and push E2E image"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: e2e-fresh
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      ecr-tag: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Checkout jupyter-deploy
+        uses: actions/checkout@v4
+        with:
+          repository: jupyter-infra/jupyter-deploy
+          ref: main
+          path: jupyter-deploy
+
+      - uses: ./.github/actions/install-uv
+
+      - uses: ./.github/actions/install-just
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_E2E_FRESH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Install JD dependencies
+        run: cd jupyter-deploy && uv sync --all-packages
+
+      - name: Restore CI project
+        run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci
+
+      - name: Pull previous image for cache
+        run: JD_DIR=jupyter-deploy just ci-e2e-pull 3 latest sandbox-ci || true
+
+      - name: Build E2E image
+        run: |
+          ECR_URL=$(JD_DIR=jupyter-deploy just ci-e2e-ecr-url 3 sandbox-ci)
+          JD_DIR=jupyter-deploy just ci-e2e-build "$ECR_URL:latest"
+
+      - name: Push to ECR
+        run: JD_DIR=jupyter-deploy just ci-e2e-push 3 ${{ github.sha }} sandbox-ci

@@ -1,0 +1,15 @@
+schema_version: 2
+required:
+  domain: "${JD_E2E_VAR_DOMAIN}"
+  subdomain: "${JD_E2E_VAR_SUBDOMAIN}"
+  letsencrypt_email: "${JD_E2E_VAR_EMAIL}"
+  oauth_app_client_id: "${JD_E2E_VAR_OAUTH_APP_CLIENT_ID}"
+  oauth_allowed_teams: ${JD_E2E_VAR_OAUTH_ALLOWED_TEAMS}
+required_sensitive:
+  oauth_app_client_secret: "${JD_E2E_VAR_OAUTH_APP_CLIENT_SECRET}"
+overrides:
+  admin_role_names: ${JD_E2E_VAR_ADMIN_ROLE_NAMES}
+  cluster_log_retention_days: 7
+  workspace_operator_chart_version: "0.1.2"
+  workspace_router_chart_version: "0.1.0"
+  workspaces_idle_shutdown_timeout_min: 1
