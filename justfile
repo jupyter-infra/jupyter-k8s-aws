@@ -153,6 +153,9 @@ ci-e2e-eks-deploy project_dir=e2e_dir ci_dir=ci_dir:
     OVERRIDE_FILE="$ROOT/docker-compose.e2e-override.yml"
     printf 'services:\n  e2e:\n    image: jupyter-k8s-aws-e2e:latest\n    volumes:\n      - ./{{project_dir}}:/workspace/{{project_dir}}\n      - ./{{ci_dir}}:/workspace/{{ci_dir}}\n' > "$OVERRIDE_FILE"
     trap 'rm -f "$OVERRIDE_FILE"' EXIT
+    # Set host UID/GID so container runs as current user (avoids permission issues)
+    echo "HOST_UID=$(id -u)" >> "$ROOT/.env"
+    echo "HOST_GID=$(id -g)" >> "$ROOT/.env"
     mkdir -p "$HOME/.kube"
     {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" down
     {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" -f "$OVERRIDE_FILE" up -d --no-build
