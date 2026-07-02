@@ -10,6 +10,10 @@ jd_dir := env_var_or_default("JD_DIR", "../jupyter-deploy")
 # Container tool
 container_tool := `command -v finch >/dev/null 2>&1 && echo "finch" || echo "docker"`
 
+# Host user UID/GID for running containers with correct permissions
+HOST_UID := `id -u`
+HOST_GID := `id -g`
+
 # List available commands
 default:
     @just --list
@@ -77,6 +81,8 @@ ci-e2e-build cache_from="" ci_dir=ci_dir:
     echo "Building base E2E image..."
     {{container_tool}} build \
         -f "$BASE_DOCKERFILE" \
+        --build-arg USER_UID={{HOST_UID}} \
+        --build-arg USER_GID={{HOST_GID}} \
         -t jupyter-k8s-aws-e2e:base \
         "$BASE_DIR"
     echo "Building CI E2E image..."
@@ -153,9 +159,6 @@ ci-e2e-eks-deploy project_dir=e2e_dir ci_dir=ci_dir:
     OVERRIDE_FILE="$ROOT/docker-compose.e2e-override.yml"
     printf 'services:\n  e2e:\n    image: jupyter-k8s-aws-e2e:latest\n    volumes:\n      - ./{{project_dir}}:/workspace/{{project_dir}}\n      - ./{{ci_dir}}:/workspace/{{ci_dir}}\n' > "$OVERRIDE_FILE"
     trap 'rm -f "$OVERRIDE_FILE"' EXIT
-    # Set host UID/GID so container runs as current user (avoids permission issues)
-    echo "HOST_UID=$(id -u)" >> "$ROOT/.env"
-    echo "HOST_GID=$(id -g)" >> "$ROOT/.env"
     mkdir -p "$HOME/.kube"
     {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" down
     {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" -f "$OVERRIDE_FILE" up -d --no-build
@@ -180,7 +183,7 @@ destroy-fresh project_dir=e2e_dir:
 
 # --- Test ---
 
-# Run E2E tests against a deployed EKS OIDC cluster
+# Run E2E tests against a deployed EKS OIDC cluster (pytest inside container)
 # Usage: just test-e2e-eks-oidc <project-dir> [test-filter] [options]
 test-e2e-eks-oidc project_dir=e2e_dir test_filter="" options="":
     #!/usr/bin/env bash
@@ -198,5 +201,5 @@ test-e2e-eks-oidc project_dir=e2e_dir test_filter="" options="":
         python -m pytest libs/jupyter-deploy-tf-aws-eks-oidc/tests/e2e \
         $FILTER_ARG \
         --project-dir {{project_dir}} \
-        --auth-state .auth/github-oauth-state.json \
+        --auth-state .auth/github-oauth-state.auth \
         -v"
