@@ -194,12 +194,33 @@ test-e2e-eks-oidc project_dir=e2e_dir test_filter="" options="":
     if [ -n "{{test_filter}}" ]; then
         FILTER_ARG="-k {{test_filter}}"
     fi
+    # Parse options (comma-separated key=value pairs)
+    CI_DIR_OPT=""
+    SKIP_SYNC="false"
+    MUTATING_OPT=""
+    MARKER_OPT=""
+    FULL_DEPLOY_OPT=""
+    if [ -n "{{options}}" ]; then
+        IFS=',' read -ra OPTS <<< "{{options}}"
+        for opt in "${OPTS[@]}"; do
+            key="${opt%%=*}" val="${opt#*=}"
+            case "$key" in
+                ci-dir)        CI_DIR_OPT="--ci-dir $val" ;;
+                skip-sync)     [ "$val" = "true" ] && SKIP_SYNC="true" ;;
+                mutate)        [ "$val" = "true" ] && MUTATING_OPT="--with-mutating-cases" ;;
+                marker)        MARKER_OPT="-m $val" ;;
+                full-deploy)   [ "$val" = "true" ] && FULL_DEPLOY_OPT="--with-full-deployment" ;;
+            esac
+        done
+    fi
+    E2E_TESTS_DIR="libs/jupyter-deploy-tf-aws-eks-oidc/tests/e2e"
+    PYTEST_ARGS="$E2E_TESTS_DIR --e2e-existing-project {{project_dir}} --e2e-tests-dir=$E2E_TESTS_DIR $FILTER_ARG $MARKER_OPT $MUTATING_OPT $FULL_DEPLOY_OPT $CI_DIR_OPT --screenshot only-on-failure --verbose --browser firefox"
+    if [ "$SKIP_SYNC" = "true" ]; then
+        PYTEST_CMD=". .venv/bin/activate && pytest"
+    else
+        PYTEST_CMD="uv run pytest"
+    fi
     E2E_COMPOSE=$(uv run --project "$JD" python -c \
         "from pytest_jupyter_deploy.image import IMAGE_PATH; print(IMAGE_PATH / 'docker-compose.yml')")
     {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" exec -e PYTHONUNBUFFERED=1 e2e \
-        bash -c ". .venv/bin/activate && cd /workspace && \
-        python -m pytest libs/jupyter-deploy-tf-aws-eks-oidc/tests/e2e \
-        $FILTER_ARG \
-        --project-dir {{project_dir}} \
-        --auth-state .auth/github-oauth-state.auth \
-        -v"
+        bash -c "cd /workspace && xvfb-run --auto-servernum bash -c '$PYTEST_CMD $PYTEST_ARGS'"
