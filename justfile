@@ -179,7 +179,7 @@ destroy-fresh project_dir=e2e_dir:
     #!/usr/bin/env bash
     set -euo pipefail
     ROOT={{justfile_directory()}}
-    cd "$ROOT/{{project_dir}}" && uv run jd down -y -v
+    cd "$ROOT/{{project_dir}}" && VIRTUAL_ENV="" uv run --project {{jd_dir}} jd down -y -v
 
 # --- Test ---
 

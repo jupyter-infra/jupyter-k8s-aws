@@ -45,15 +45,17 @@ def get_totp(totp_secret: str) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed Playwright auth state for CI")
-    parser.add_argument("--project-dir", type=Path, required=True,
+    parser.add_argument("--project-dir", type=Path,
                         help="Path to deployed JD project (e.g. ~/ci-clusters/org-pr)")
+    parser.add_argument("--url",
+                        help="Direct URL of deployed app (alternative to --project-dir)")
     parser.add_argument("--region", default="us-west-2")
     parser.add_argument("--storage-state", type=Path,
                         default=Path(".auth/github-oauth-state.json"))
     args = parser.parse_args()
 
-    if not args.project_dir.exists():
-        print(f"Error: project dir does not exist: {args.project_dir}")
+    if not args.project_dir and not args.url:
+        print("Error: must provide either --project-dir or --url")
         sys.exit(1)
 
     print("Reading bot credentials from Secrets Manager...")
@@ -63,14 +65,19 @@ def main() -> None:
 
     print(f"Bot account: {email}")
 
-    print("Getting workspace URL from project...")
-    result = subprocess.run(
-        ["jd", "show", "-o", "workspace_base_url", "--text"],
-        cwd=args.project_dir, capture_output=True, text=True, check=True
-    )
-    workspace_url = result.stdout.strip()
-    # Strip /workspaces suffix to get the base app URL
-    jupyterlab_url = workspace_url.replace("/workspaces", "")
+    if args.url:
+        jupyterlab_url = args.url.rstrip("/")
+    else:
+        if not args.project_dir.exists():
+            print(f"Error: project dir does not exist: {args.project_dir}")
+            sys.exit(1)
+        print("Getting workspace URL from project...")
+        result = subprocess.run(
+            ["jd", "show", "-o", "workspace_base_url", "--text"],
+            cwd=args.project_dir, capture_output=True, text=True, check=True
+        )
+        workspace_url = result.stdout.strip()
+        jupyterlab_url = workspace_url.replace("/workspaces", "")
     print(f"Target URL: {jupyterlab_url}")
 
     print("Launching Playwright...")
