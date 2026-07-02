@@ -119,10 +119,13 @@ ci-e2e-push oauth_app_num extra_tag="" ci_dir=ci_dir:
 seed-auth-state project_dir=e2e_dir ci_dir=ci_dir:
     #!/usr/bin/env bash
     set -euo pipefail
+    unset VIRTUAL_ENV
     ROOT={{justfile_directory()}}
     JD={{jd_dir}}
     E2E_COMPOSE=$(uv run --project "$JD" python -c \
         "from pytest_jupyter_deploy.image import IMAGE_PATH; print(IMAGE_PATH / 'docker-compose.yml')")
+    CONTAINER=$({{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" ps -q e2e)
+    {{container_tool}} cp "$ROOT/ci" "$CONTAINER:/workspace/ci"
     {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" exec -e PYTHONUNBUFFERED=1 e2e \
         bash -c "cd /workspace && Xvfb :99 -screen 0 1280x1024x24 & sleep 1 && DISPLAY=:99 . .venv/bin/activate && python ci/scripts/seed_auth_state.py --url \$(jupyter-deploy show -o get_started_url --text -p {{project_dir}})"
     PYTHONPATH="$JD/scripts" uv run --project "$JD" python "$JD/scripts/sync_auth_state.py" export {{ci_dir}}
@@ -192,7 +195,7 @@ destroy-fresh project_dir=e2e_dir:
     #!/usr/bin/env bash
     set -euo pipefail
     ROOT={{justfile_directory()}}
-    cd "$ROOT/{{project_dir}}" && VIRTUAL_ENV="" uv run --project {{jd_dir}} jd down -y -v
+    cd "$ROOT/{{project_dir}}" && unset VIRTUAL_ENV && uv run --project {{jd_dir}} jd down -y -v
 
 # --- Test ---
 

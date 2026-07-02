@@ -22,6 +22,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    env:
+      VIRTUAL_ENV: ""
     outputs:
       ecr-tag: ${{ github.sha }}
     steps:
