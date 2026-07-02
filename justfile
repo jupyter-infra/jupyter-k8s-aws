@@ -114,6 +114,19 @@ ci-e2e-push oauth_app_num extra_tag="" ci_dir=ci_dir:
 
 # --- Auth ---
 
+# Seed fresh auth state inside the container (full GitHub login + OAuth flow)
+# Usage: just seed-auth-state <project-dir> [ci-dir]
+seed-auth-state project_dir=e2e_dir ci_dir=ci_dir:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ROOT={{justfile_directory()}}
+    JD={{jd_dir}}
+    E2E_COMPOSE=$(uv run --project "$JD" python -c \
+        "from pytest_jupyter_deploy.image import IMAGE_PATH; print(IMAGE_PATH / 'docker-compose.yml')")
+    {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" exec -e PYTHONUNBUFFERED=1 e2e \
+        bash -c "cd /workspace && Xvfb :99 -screen 0 1280x1024x24 & sleep 1 && DISPLAY=:99 . .venv/bin/activate && python ci/scripts/seed_auth_state.py --url \$(jupyter-deploy show -o get_started_url --text -p {{project_dir}})"
+    PYTHONPATH="$JD/scripts" uv run --project "$JD" python "$JD/scripts/sync_auth_state.py" export {{ci_dir}}
+
 # Import Playwright auth state from Secrets Manager (run ci-restore first)
 auth-import ci_dir=ci_dir:
     PYTHONPATH={{jd_dir}}/scripts uv run --project {{jd_dir}} python {{jd_dir}}/scripts/sync_auth_state.py import {{ci_dir}}

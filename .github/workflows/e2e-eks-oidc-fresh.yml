@@ -187,6 +187,10 @@ jobs:
             --reuse-values \
             --wait --timeout 5m
 
+      - name: Refresh auth state (full GitHub login)
+        if: success()
+        run: JD_DIR=jupyter-deploy just seed-auth-state sandbox-e2e sandbox-ci
+
       - name: Verify deployment
         if: success()
         run: >-

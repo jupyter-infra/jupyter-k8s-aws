@@ -91,6 +91,25 @@ def main() -> None:
         context = browser.new_context()
         page = context.new_page()
 
+        # Step 1: Full GitHub login to establish logged_in=yes session cookie.
+        # Must do this before OAuth flow — OAuth alone only sets logged_in=no.
+        print("Step 1: GitHub direct login (username + password + TOTP)...")
+        page.goto("https://github.com/login", wait_until="load", timeout=30000)
+        page.fill('input[name="login"]', email)
+        page.fill('input[name="password"]', password)
+        page.click('input[type="submit"]')
+        page.wait_for_url("**/sessions/two-factor/app**", timeout=30000)
+        totp_code = get_totp(totp_secret)
+        page.fill("#app_totp", totp_code)
+        try:
+            page.wait_for_url(lambda url: "two-factor" not in url, timeout=10000)
+        except Exception:
+            page.click('button[type="submit"]')
+            page.wait_for_url(lambda url: "two-factor" not in url, timeout=10000)
+        print(f"  GitHub login complete, now at: {page.url}")
+
+        # Step 2: Navigate to app URL to complete OAuth flow and get app cookies.
+        print("Step 2: OAuth flow via app URL...")
         oauth_app = GitHubOAuth2ProxyApplication(
             page=page,
             jupyterlab_url=jupyterlab_url,
@@ -99,13 +118,7 @@ def main() -> None:
             ci_password=password,
             ci_totp_fn=lambda: get_totp(totp_secret),
         )
-
-        print("Logging in as bot...")
-        oauth_app.login_with_2fa(
-            email=email,
-            password=password,
-            totp_fn=lambda: get_totp(totp_secret),
-        )
+        oauth_app.ensure_authenticated()
 
         browser.close()
 
