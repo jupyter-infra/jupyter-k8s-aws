@@ -179,7 +179,7 @@ destroy-fresh project_dir=e2e_dir:
     #!/usr/bin/env bash
     set -euo pipefail
     ROOT={{justfile_directory()}}
-    cd "$ROOT/{{project_dir}}" && uv run --project {{jd_dir}} jd down -y -v
+    cd "$ROOT/{{project_dir}}" && uv run jd down -y -v
 
 # --- Test ---
 
@@ -214,7 +214,8 @@ test-e2e-eks-oidc project_dir=e2e_dir test_filter="" options="":
         done
     fi
     E2E_TESTS_DIR="libs/jupyter-deploy-tf-aws-eks-oidc/tests/e2e"
-    PYTEST_ARGS="$E2E_TESTS_DIR --e2e-existing-project {{project_dir}} --e2e-tests-dir=$E2E_TESTS_DIR $FILTER_ARG $MARKER_OPT $MUTATING_OPT $FULL_DEPLOY_OPT $CI_DIR_OPT --screenshot only-on-failure --verbose --browser firefox"
+    DEFAULT_MARKER="-m e2e"
+    PYTEST_ARGS="$E2E_TESTS_DIR --e2e-existing-project {{project_dir}} --e2e-tests-dir=$E2E_TESTS_DIR $FILTER_ARG ${MARKER_OPT:-$DEFAULT_MARKER} $MUTATING_OPT $FULL_DEPLOY_OPT $CI_DIR_OPT --screenshot only-on-failure --verbose --browser firefox"
     if [ "$SKIP_SYNC" = "true" ]; then
         PYTEST_CMD=". .venv/bin/activate && pytest"
     else
