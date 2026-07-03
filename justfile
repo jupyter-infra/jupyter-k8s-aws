@@ -195,7 +195,7 @@ destroy-fresh project_dir=e2e_dir:
     #!/usr/bin/env bash
     set -euo pipefail
     ROOT={{justfile_directory()}}
-    cd "$ROOT/{{project_dir}}" && unset VIRTUAL_ENV && uv run --project {{jd_dir}} jd down -y -v
+    cd "$ROOT/{{project_dir}}" && {{jd_dir}}/.venv/bin/jd down -y -v
 
 # --- Test ---
 
@@ -239,5 +239,22 @@ test-e2e-eks-oidc project_dir=e2e_dir test_filter="" options="":
     fi
     E2E_COMPOSE=$(uv run --project "$JD" python -c \
         "from pytest_jupyter_deploy.image import IMAGE_PATH; print(IMAGE_PATH / 'docker-compose.yml')")
+    # Build override to mount project + ci dirs and pin image
+    OVERRIDE_FILE="$ROOT/docker-compose.e2e-override.yml"
+    {
+        echo "services:"
+        echo "  e2e:"
+        echo "    image: jupyter-k8s-aws-e2e:latest"
+        echo "    volumes:"
+        echo "      - ./{{project_dir}}:/workspace/{{project_dir}}"
+        if [ -n "$CI_DIR_OPT" ]; then
+            CI_DIR_VAL="${CI_DIR_OPT#--ci-dir }"
+            echo "      - ./${CI_DIR_VAL}:/workspace/${CI_DIR_VAL}"
+        fi
+    } > "$OVERRIDE_FILE"
+    trap 'rm -f "$OVERRIDE_FILE"' EXIT
+    mkdir -p "$HOME/.kube"
+    {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" down
+    {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" -f "$OVERRIDE_FILE" up -d --no-build
     {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" exec -e PYTHONUNBUFFERED=1 e2e \
         bash -c "cd /workspace && xvfb-run --auto-servernum bash -c '$PYTEST_CMD $PYTEST_ARGS'"
