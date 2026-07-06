@@ -22,8 +22,6 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    env:
-      VIRTUAL_ENV: ""
     outputs:
       ecr-tag: ${{ github.sha }}
     steps:
@@ -56,6 +54,9 @@ jobs:
 
       - name: Install JD dependencies
         run: cd jupyter-deploy && uv sync --all-packages
+
+      - name: Set JD venv as active
+        run: echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/jupyter-deploy/.venv" >> $GITHUB_ENV
 
       - name: Restore CI project
         run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci

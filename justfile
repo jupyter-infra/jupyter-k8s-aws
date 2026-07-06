@@ -119,7 +119,6 @@ ci-e2e-push oauth_app_num extra_tag="" ci_dir=ci_dir:
 seed-auth-state project_dir=e2e_dir ci_dir=ci_dir:
     #!/usr/bin/env bash
     set -euo pipefail
-    unset VIRTUAL_ENV
     ROOT={{justfile_directory()}}
     JD={{jd_dir}}
     E2E_COMPOSE=$(uv run --project "$JD" python -c \
@@ -195,7 +194,7 @@ destroy-fresh project_dir=e2e_dir:
     #!/usr/bin/env bash
     set -euo pipefail
     ROOT={{justfile_directory()}}
-    cd "$ROOT/{{project_dir}}" && {{jd_dir}}/.venv/bin/jd down -y -v
+    cd "$ROOT/{{project_dir}}" && uv run jd down -y -v
 
 # --- Test ---
 
