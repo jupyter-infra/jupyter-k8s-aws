@@ -319,7 +319,10 @@ jobs:
         run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci
 
       - name: Restore EKS project
+        id: restore-eks
         run: JD_DIR=jupyter-deploy just ci-restore-eks 3 sandbox-ci sandbox-e2e
+        continue-on-error: true
 
       - name: Destroy cluster
+        if: steps.restore-eks.outcome == 'success'
         run: JD_DIR=jupyter-deploy just destroy-fresh sandbox-e2e
