@@ -43,3 +43,8 @@ sandbox-*/
 
 # CI Python venv
 ci/.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
