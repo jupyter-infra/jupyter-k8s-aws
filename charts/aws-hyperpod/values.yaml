@@ -107,16 +107,60 @@ clusterWebUI:
         memory: 32Mi
 
 # Remote access configuration
+#
+# accessMechanisms defines how users connect to workspaces. Each entry has a
+# `type` and its own `configuration` block. Today exactly one of ssm/directSSH
+# may be active; future releases add websocket and allow combinations.
+#
+#   type: ssm        - SSM Agent sidecar + remote-access-server (existing behavior)
+#     configuration.ssmManagedNodeRole  (required)
+#   type: directSSH  - vetted OpenSSH sshd via init container (direct VPC access)
+#     configuration.dnsDomain            (required)
+#
+# directSSH prerequisites (configured separately, not deployed by this chart):
+#   1. VPC CNI - Pods must have VPC-routable IPs (default on EKS with AWS VPC CNI)
+#   2. ExternalDNS - Deployed with domain-filter matching the dnsDomain
+#   3. Route53 Private Hosted Zone - Zone name must match the dnsDomain
+#   4. Network connectivity - Clients in VPC or connected via VPN/Direct Connect
+#   5. Security Group - Pod ENI SG must allow inbound TCP port 22 from VPN CIDR
+#
+# Example:
+#   accessMechanisms:
+#     - type: ssm
+#       configuration:
+#         ssmManagedNodeRole: "service-role/sagemaker-space-SSMManagedNode-..."
+#     - type: directSSH
+#       configuration:
+#         dnsDomain: "spaces.example.com"
+#
 remoteAccess:
   enabled: false
-  ssmManagedNodeRole: ""
+
+  # Supported types: ssm, directSSH
+  # Each entry requires a type and configuration block.
+  # Only one of ssm/directSSH may be active at a time.
+  #
+  # For SSM:
+  #   accessMechanisms:
+  #     - type: ssm
+  #       configuration:
+  #         ssmManagedNodeRole: "service-role/sagemaker-space-SSMManagedNode-..."
+  #
+  # For directSSH:
+  #   accessMechanisms:
+  #     - type: directSSH
+  #       configuration:
+  #         dnsDomain: "spaces.example.com"
+  #
+  # When empty, falls back to legacy flat ssmManagedNodeRole field below.
+  accessMechanisms: []
+
+  # --- Shared SSM settings (used by the ssm mechanism; managed by service team) ---
   ssmSidecarImage:
     containerRegistry: ""
     repository: ""
     tag: ""
   ssmDocumentName: "AWS-StartSSHSession"
-  # Container and path configuration shared between podEventsContext and sidecar spec.
-  # Changing these values updates both the controller context and the sidecar container.
   sidecarContainerName: "ssm-agent-sidecar"
   workspaceContainerName: "workspace"
   registrationMarkerFile: "/tmp/ssm-registered"
@@ -124,6 +168,17 @@ remoteAccess:
   registrationScript: "/usr/local/bin/register-ssm.sh"
   remoteAccessServerScript: "/opt/amazon/sagemaker/workspace/remote-access/start-remote-access-server.sh"
   remoteAccessServerPort: "2222"
+
+  # --- Native SSH image (used by the directSSH mechanism; managed by service team) ---
+  nativeSshImage:
+    containerRegistry: ""
+    repository: ""
+    tag: ""
+
+  # --- DEPRECATED: legacy flat SSM config, honored only when accessMechanisms is
+  # empty. Supported for backwards compatibility with existing SSM deployments and
+  # will be removed in a future release. Migrate to accessMechanisms above. ---
+  ssmManagedNodeRole: ""
 
 # [STORAGE] StorageClasses for Workspaces
 storageClass:

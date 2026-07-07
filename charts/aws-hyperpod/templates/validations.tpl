@@ -7,20 +7,33 @@
 {{- fail "clusterWebUI.domain is required when clusterWebUI.enabled is true" }}
 {{- end }}
 
-{{- if and .Values.remoteAccess.enabled (not .Values.remoteAccess.ssmManagedNodeRole) }}
-{{- fail "remoteAccess.ssmManagedNodeRole is required when remoteAccess.enabled is true" }}
+{{- if .Values.remoteAccess.enabled }}
+{{- $mechanisms := include "remoteAccess.mechanisms" . | fromJsonArray }}
+{{- if not $mechanisms }}
+{{- fail "remoteAccess.enabled is true but no access mechanism is configured. Set remoteAccess.accessMechanisms (or legacy remoteAccess.ssmManagedNodeRole)." }}
 {{- end }}
-
-{{- if and .Values.remoteAccess.enabled (not .Values.remoteAccess.ssmSidecarImage.containerRegistry) }}
-{{- fail "remoteAccess.ssmSidecarImage.containerRegistry is required when remoteAccess.enabled is true" }}
+{{- $seen := dict }}
+{{- $shellCount := 0 }}
+{{- range $mechanisms }}
+{{- if not (or (eq .type "ssm") (eq .type "directSSH")) }}
+{{- fail (printf "remoteAccess.accessMechanisms: unsupported type %q (must be 'ssm' or 'directSSH')" .type) }}
 {{- end }}
-
-{{- if and .Values.remoteAccess.enabled (not .Values.remoteAccess.ssmSidecarImage.repository) }}
-{{- fail "remoteAccess.ssmSidecarImage.repository is required when remoteAccess.enabled is true" }}
+{{- if hasKey $seen .type }}
+{{- fail (printf "remoteAccess.accessMechanisms: duplicate type %q" .type) }}
 {{- end }}
-
-{{- if and .Values.remoteAccess.enabled (not .Values.remoteAccess.ssmSidecarImage.tag) }}
-{{- fail "remoteAccess.ssmSidecarImage.tag is required when remoteAccess.enabled is true" }}
+{{- $seen = set $seen .type true }}
+{{- $shellCount = add $shellCount 1 }}
+{{- $cfg := .configuration | default dict }}
+{{- if and (eq .type "ssm") (not $cfg.ssmManagedNodeRole) }}
+{{- fail "remoteAccess.accessMechanisms: ssm requires configuration.ssmManagedNodeRole" }}
+{{- end }}
+{{- if and (eq .type "directSSH") (not $cfg.dnsDomain) }}
+{{- fail "remoteAccess.accessMechanisms: directSSH requires configuration.dnsDomain" }}
+{{- end }}
+{{- end }}
+{{- if gt $shellCount 1 }}
+{{- fail "remoteAccess.accessMechanisms: ssm and directSSH are mutually exclusive; configure only one" }}
+{{- end }}
 {{- end }}
 
 {{/* Validate rotator and JWT configuration when clusterWebUI is enabled */}}

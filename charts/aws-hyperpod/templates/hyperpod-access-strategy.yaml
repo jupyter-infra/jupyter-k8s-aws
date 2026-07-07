@@ -5,8 +5,12 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   displayName: HyperPod Access Strategy
-  {{- if .Values.clusterWebUI.enabled }}
+  {{- $hasSSM := eq (include "remoteAccess.hasMechanism" (list . "ssm")) "true" }}
+  {{- $hasSSH := eq (include "remoteAccess.hasMechanism" (list . "directSSH")) "true" }}
+  {{- $sshConfig := include "remoteAccess.mechanismConfig" (list . "directSSH") | fromJson }}
+  {{- if or .Values.clusterWebUI.enabled $hasSSH }}
   accessResourceTemplates:
+    {{- if .Values.clusterWebUI.enabled }}
     # The authorized route - tries token verification on already authenticated requests
     - kind: IngressRoute
       apiVersion: traefik.io/v1alpha1
@@ -52,6 +56,31 @@ spec:
                 - name: "{{`{{ .Service.Name }}`}}"
                   namespace: "{{`{{ .Service.Namespace }}`}}"
                   port: 8888
+    {{- end }}
+
+    {{- if $hasSSH }}
+    # Native SSH: Headless Service for ExternalDNS
+    # DNS resolves to pod VPC IP directly (requires VPC CNI)
+    - kind: Service
+      apiVersion: v1
+      namePrefix: ssh
+      template: |
+        metadata:
+          labels:
+            app.kubernetes.io/component: native-ssh
+          annotations:
+            external-dns.alpha.kubernetes.io/hostname: "{{`{{ .Workspace.Name }}`}}.{{`{{ .Workspace.Namespace }}`}}.{{ $sshConfig.dnsDomain }}"
+            external-dns.alpha.kubernetes.io/ttl: "30"
+        spec:
+          clusterIP: None
+          selector:
+            workspace.jupyter.org/workspace-name: "{{`{{ .Workspace.Name }}`}}"
+          ports:
+            - name: ssh
+              port: 22
+              targetPort: 22
+              protocol: TCP
+    {{- end }}
   {{- else }}
   accessResourceTemplates: []
   {{- end }}
@@ -68,15 +97,12 @@ spec:
   {{- end }}
 
   createConnectionHandler: "k8s-native"
-  {{- if .Values.remoteAccess.enabled }}
+  {{- if $hasSSM }}
   createConnectionHandlerMap:
     vscode-remote: "aws:createSession"
     kiro-remote: "aws:createSession"
     cursor-remote: "aws:createSession"
-  {{- end }}
   podEventsHandler: "aws:ssm-remote-access"
-
-  {{- if .Values.remoteAccess.enabled }}
   createConnectionContext:
     podUid: "extensionapi::PodUid()"
     ssmDocumentName: "{{ .Values.remoteAccess.ssmDocumentName }}"
@@ -84,7 +110,7 @@ spec:
   podEventsContext:
     podUid: "controller::PodUid()"
     region: "{{ required "aws.region is required when remoteAccess is enabled" .Values.aws.region }}"
-    ssmManagedNodeRole: "{{ .Values.remoteAccess.ssmManagedNodeRole }}"
+    ssmManagedNodeRole: "{{ (include "remoteAccess.mechanismConfig" (list . "ssm") | fromJson).ssmManagedNodeRole }}"
     sidecarContainerName: "{{ .Values.remoteAccess.sidecarContainerName }}"
     workspaceContainerName: "{{ .Values.remoteAccess.workspaceContainerName }}"
     registrationStateFile: "{{ .Values.remoteAccess.registrationStateFile }}"
@@ -94,10 +120,10 @@ spec:
     remoteAccessServerPort: "{{ .Values.remoteAccess.remoteAccessServerPort }}"
   {{- end }}
 
-  # Deployment modifications for SSM remote access
+  # Deployment modifications for remote access
   deploymentModifications:
     podModifications:
-      {{- if .Values.remoteAccess.enabled }}
+      {{- if $hasSSM }}
       additionalContainers:
         - name: "{{ .Values.remoteAccess.sidecarContainerName }}"
           image: "{{ .Values.remoteAccess.ssmSidecarImage.containerRegistry }}/{{ .Values.remoteAccess.ssmSidecarImage.repository }}:{{ .Values.remoteAccess.ssmSidecarImage.tag }}"
@@ -131,12 +157,14 @@ spec:
             periodSeconds: 2
       {{- end }}
 
+      {{- if .Values.remoteAccess.enabled }}
       volumes:
         - name: "workspace-base"
           emptyDir:
             sizeLimit: "1Gi"
 
       initContainers:
+        {{- if $hasSSM }}
         - name: workspace-init-container
           image: "{{ .Values.remoteAccess.ssmSidecarImage.containerRegistry }}/{{ .Values.remoteAccess.ssmSidecarImage.repository }}:{{ .Values.remoteAccess.ssmSidecarImage.tag }}"
           command:
@@ -144,11 +172,24 @@ spec:
           volumeMounts:
             - name: workspace-base
               mountPath: /workspace_base_dir
+        {{- end }}
+        {{- if $hasSSH }}
+        - name: native-ssh-init
+          image: "{{ .Values.remoteAccess.nativeSshImage.containerRegistry }}/{{ .Values.remoteAccess.nativeSshImage.repository }}:{{ .Values.remoteAccess.nativeSshImage.tag }}"
+          command:
+            - /opt/amazon/sagemaker/workspace/bin/entrypoint-workspace-init-container
+          volumeMounts:
+            - name: workspace-base
+              mountPath: /workspace_base_dir
+        {{- end }}
+      {{- end }}
 
       primaryContainerModifications:
+        {{- if .Values.remoteAccess.enabled }}
         volumeMounts:
           - name: "workspace-base"
             mountPath: "/opt/amazon/sagemaker/workspace"
+        {{- end }}
         mergeEnv:
           - name: WORKSPACE_NAMESPACE
             valueTemplate: "{{`{{ .Workspace.Namespace }}`}}"
