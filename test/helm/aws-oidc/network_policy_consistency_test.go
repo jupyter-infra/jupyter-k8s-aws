@@ -35,6 +35,8 @@ var _ = Describe("Network Policy Consistency", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	const webAppComponent = "web-app"
+
 	// The full set of behind-traefik components. Adding a fifth component that
 	// sits behind traefik should mean adding a row here — that is intentional
 	// friction so the shared invariants are a conscious decision.
@@ -42,7 +44,7 @@ var _ = Describe("Network Policy Consistency", func() {
 		{"dex", "dex/network-policy.yaml", "dex", "oauth", 5556},
 		{"authmiddleware", "authmiddleware/network-policy.yaml", "authmiddleware", "auth", 8080},
 		{"oauth2-proxy", "oauth2-proxy/network-policy.yaml", "oauth2-proxy", "auth", 4180},
-		{"web-app", "web-app/network-policy.yaml", "web-app", "web-app", 8090},
+		{webAppComponent, webAppComponent + "/network-policy.yaml", webAppComponent, webAppComponent, 8090},
 	}
 
 	var policies map[string]networkingv1.NetworkPolicy
