@@ -1,0 +1,141 @@
+name: "E2E EKS OIDC job"
+
+on:
+  workflow_call:
+    inputs:
+      test-filter:
+        description: "Pytest -k filter"
+        required: false
+        type: string
+        default: ""
+      marker:
+        description: "Pytest marker to select (e.g. mutating)"
+        required: false
+        type: string
+        default: ""
+      mutate:
+        description: "Enable mutating test cases"
+        required: false
+        type: boolean
+        default: false
+      timeout-minutes:
+        description: "Job timeout in minutes"
+        required: false
+        type: number
+        default: 120
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+        default: ""
+      ecr-tag:
+        description: "ECR image tag to pull"
+        required: true
+        type: string
+      oauth-app-num:
+        description: "OAuth app slot number (1-6)"
+        required: false
+        type: number
+        default: 3
+
+jobs:
+  test:
+    name: "Run E2E tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    environment: e2e-fresh
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Checkout jupyter-deploy
+        uses: actions/checkout@v4
+        with:
+          repository: jupyter-infra/jupyter-deploy
+          ref: main
+          path: jupyter-deploy
+
+      - uses: ./.github/actions/install-uv
+
+      - uses: ./.github/actions/install-just
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_E2E_FRESH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-duration-seconds: 7200
+
+      - name: Install JD dependencies
+        run: cd jupyter-deploy && uv sync --all-packages
+
+      - name: Set JD venv as active
+        run: echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/jupyter-deploy/.venv" >> "$GITHUB_ENV"
+
+      - name: Restore CI project
+        run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci
+
+      - name: Restore EKS project
+        run: JD_DIR=jupyter-deploy just ci-restore-eks ${{ inputs.oauth-app-num }} sandbox-ci sandbox-e2e
+
+      - name: Generate .env
+        run: >-
+          JD_DIR=jupyter-deploy just env-setup-eks sandbox-e2e sandbox-ci ${{ inputs.oauth-app-num }}
+          "org=jupyter-infra,team=kube2-access,rbac-team=kube2-access,admin-roles=[\"Admin\",\"jupyter-k8s-aws-ci-e2e-52ed8fab\"]"
+
+      - name: Import auth state
+        run: JD_DIR=jupyter-deploy just auth-import sandbox-ci
+
+      - name: Pull E2E image
+        run: JD_DIR=jupyter-deploy just ci-e2e-pull ${{ inputs.oauth-app-num }} ${{ inputs.ecr-tag }} sandbox-ci
+
+      - name: Build test filter
+        id: filter
+        env:
+          TEST_FILTER: ${{ inputs.test-filter }}
+          MARKER: ${{ inputs.marker }}
+          MUTATE: ${{ inputs.mutate }}
+        run: |
+          FILTER="$TEST_FILTER"
+          OPTIONS="ci-dir=sandbox-ci,skip-sync=true"
+          if [ "$MUTATE" = "true" ]; then
+            OPTIONS="mutate=true,${OPTIONS}"
+          fi
+          if [ -n "$MARKER" ]; then
+            OPTIONS="marker=${MARKER},${OPTIONS}"
+          fi
+          echo "filter=${FILTER}" >> "$GITHUB_OUTPUT"
+          echo "options=${OPTIONS}" >> "$GITHUB_OUTPUT"
+
+      - name: Run E2E tests
+        run: >-
+          JD_DIR=jupyter-deploy just test-e2e-eks-oidc sandbox-e2e
+          "${{ steps.filter.outputs.filter }}"
+          "${{ steps.filter.outputs.options }}"
+
+      - name: Export auth state
+        if: always()
+        run: JD_DIR=jupyter-deploy just auth-export sandbox-ci
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ inputs.marker || 'non-mutating' }}
+          path: test-results/
+          if-no-files-found: ignore
+
+      - name: Upload test results to S3
+        if: failure()
+        continue-on-error: true
+        run: JD_DIR=jupyter-deploy just ci-upload-test-results ${{ inputs.oauth-app-num }} sandbox-ci
