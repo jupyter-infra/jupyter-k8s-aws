@@ -70,23 +70,23 @@ var _ = Describe("Node Selector and Tolerations", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			helmTemplate(chartDir, outputDir,
-				"--set", "domain=test.example.com",
-				"--set", "certManager.email=admin@example.com",
-				"--set", "storageClass.efs.parameters.fileSystemId=fs-000",
-				"--set", "github.clientId=cid",
-				"--set", "github.clientSecret=csec",
-				"--set", "github.orgs[0].name=org",
-				"--set", "github.orgs[0].teams[0]=t",
-				"--set", "githubRbac.orgs[0].name=org",
-				"--set", "githubRbac.orgs[0].teams[0]=t",
-				"--set", "oauth2Proxy.cookieSecret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-				"--set", "authmiddleware.enableBearerAuth=true",
-				"--set", "webApp.enabled=true",
-				"--set", "nodeSelector.jupyter-deploy/role=components",
-				"--set", "tolerations[0].key=jupyter-deploy/role",
-				"--set", "tolerations[0].operator=Equal",
-				"--set", "tolerations[0].value=components",
-				"--set", "tolerations[0].effect=NoSchedule",
+				helmSetFlag, "domain=test.example.com",
+				helmSetFlag, "certManager.email=admin@example.com",
+				helmSetFlag, "storageClass.efs.parameters.fileSystemId=fs-000",
+				helmSetFlag, "github.clientId=cid",
+				helmSetFlag, "github.clientSecret=csec",
+				helmSetFlag, "github.orgs[0].name=org",
+				helmSetFlag, "github.orgs[0].teams[0]=t",
+				helmSetFlag, "githubRbac.orgs[0].name=org",
+				helmSetFlag, "githubRbac.orgs[0].teams[0]=t",
+				helmSetFlag, "oauth2Proxy.cookieSecret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+				helmSetFlag, "authmiddleware.enableBearerAuth=true",
+				helmSetFlag, "webApp.enabled=true",
+				helmSetFlag, "nodeSelector.jupyter-deploy/role=components",
+				helmSetFlag, "tolerations[0].key=jupyter-deploy/role",
+				helmSetFlag, "tolerations[0].operator=Equal",
+				helmSetFlag, "tolerations[0].value=components",
+				helmSetFlag, "tolerations[0].effect=NoSchedule",
 			)
 			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
 		})
@@ -153,19 +153,19 @@ var _ = Describe("Node Selector and Tolerations", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			helmTemplate(chartDir, outputDir,
-				"--set", "domain=test.example.com",
-				"--set", "certManager.email=admin@example.com",
-				"--set", "storageClass.efs.parameters.fileSystemId=fs-000",
-				"--set", "github.clientId=cid",
-				"--set", "github.clientSecret=csec",
-				"--set", "github.orgs[0].name=org",
-				"--set", "github.orgs[0].teams[0]=t",
-				"--set", "githubRbac.orgs[0].name=org",
-				"--set", "githubRbac.orgs[0].teams[0]=t",
-				"--set", "oauth2Proxy.cookieSecret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-				"--set", "authmiddleware.enableBearerAuth=true",
-				"--set", "nodeSelector.jupyter-deploy/role=components",
-				"--set", "traefik.nodeSelector.jupyter-deploy/role=edge",
+				helmSetFlag, "domain=test.example.com",
+				helmSetFlag, "certManager.email=admin@example.com",
+				helmSetFlag, "storageClass.efs.parameters.fileSystemId=fs-000",
+				helmSetFlag, "github.clientId=cid",
+				helmSetFlag, "github.clientSecret=csec",
+				helmSetFlag, "github.orgs[0].name=org",
+				helmSetFlag, "github.orgs[0].teams[0]=t",
+				helmSetFlag, "githubRbac.orgs[0].name=org",
+				helmSetFlag, "githubRbac.orgs[0].teams[0]=t",
+				helmSetFlag, "oauth2Proxy.cookieSecret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+				helmSetFlag, "authmiddleware.enableBearerAuth=true",
+				helmSetFlag, "nodeSelector.jupyter-deploy/role=components",
+				helmSetFlag, "traefik.nodeSelector.jupyter-deploy/role=edge",
 			)
 			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
 		})
@@ -209,7 +209,7 @@ func helmTemplate(chartDir, outputDir string, extraArgs ...string) {
 	out, err := exec.Command("helm", "dependency", "build", chartDir).CombinedOutput()
 	Expect(err).NotTo(HaveOccurred(), "helm dependency build failed: %s", string(out))
 
-	args := append([]string{"template", helmReleaseName, chartDir, "--output-dir", outputDir}, extraArgs...)
+	args := append([]string{helmTemplateCmd, helmReleaseName, chartDir, "--output-dir", outputDir}, extraArgs...)
 	out, err = exec.Command("helm", args...).CombinedOutput()
 	Expect(err).NotTo(HaveOccurred(), "helm template failed: %s", string(out))
 }

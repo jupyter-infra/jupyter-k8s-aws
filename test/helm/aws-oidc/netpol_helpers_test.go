@@ -15,23 +15,29 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-// helmReleaseName is the release name used when rendering the chart in tests.
-const helmReleaseName = "jk8s"
+const (
+	helmReleaseName = "jk8s"
+	helmSetFlag     = "--set"
+	helmTemplateCmd = "template"
+
+	oauthStrategyFile  = "access-strategy/oauth-access-strategy.yaml"
+	bearerStrategyFile = "access-strategy/bearer-access-strategy.yaml"
+)
 
 // oidcRequiredArgs returns the standard helm values needed to render the
 // aws-oidc chart in tests.
 func oidcRequiredArgs() []string {
 	return []string{
-		"--set", "domain=test.example.com",
-		"--set", "certManager.email=admin@example.com",
-		"--set", "storageClass.efs.parameters.fileSystemId=fs-000",
-		"--set", "github.clientId=cid",
-		"--set", "github.clientSecret=csec",
-		"--set", "github.orgs[0].name=org",
-		"--set", "github.orgs[0].teams[0]=t",
-		"--set", "githubRbac.orgs[0].name=org",
-		"--set", "githubRbac.orgs[0].teams[0]=t",
-		"--set", "oauth2Proxy.cookieSecret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+		helmSetFlag, "domain=test.example.com",
+		helmSetFlag, "certManager.email=admin@example.com",
+		helmSetFlag, "storageClass.efs.parameters.fileSystemId=fs-000",
+		helmSetFlag, "github.clientId=cid",
+		helmSetFlag, "github.clientSecret=csec",
+		helmSetFlag, "github.orgs[0].name=org",
+		helmSetFlag, "github.orgs[0].teams[0]=t",
+		helmSetFlag, "githubRbac.orgs[0].name=org",
+		helmSetFlag, "githubRbac.orgs[0].teams[0]=t",
+		helmSetFlag, "oauth2Proxy.cookieSecret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
 	}
 }
 

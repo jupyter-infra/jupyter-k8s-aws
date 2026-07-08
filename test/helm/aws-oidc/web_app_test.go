@@ -52,9 +52,9 @@ var _ = Describe("Web App", func() {
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 
 			args := append(oidcRequiredArgs(),
-				"--set", "webApp.enabled=true",
-				"--set", "webApp.clusterAccess.clusterName=test-cluster",
-				"--set", "webApp.clusterAccess.apiServer=https://api.test-cluster.example.com",
+				helmSetFlag, "webApp.enabled=true",
+				helmSetFlag, "webApp.clusterAccess.clusterName=test-cluster",
+				helmSetFlag, "webApp.clusterAccess.apiServer=https://api.test-cluster.example.com",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
@@ -116,7 +116,7 @@ var _ = Describe("Web App", func() {
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 
 			args := append(oidcRequiredArgs(),
-				"--set", "webApp.enabled=true",
+				helmSetFlag, "webApp.enabled=true",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
@@ -168,9 +168,9 @@ var _ = Describe("Web App", func() {
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 
 			args := append(oidcRequiredArgs(),
-				"--set", "webApp.enabled=true",
-				"--set", "nodeSelector.jupyter-deploy/role=components",
-				"--set", "webApp.nodeSelector.jupyter-deploy/role=web-ui",
+				helmSetFlag, "webApp.enabled=true",
+				helmSetFlag, "nodeSelector.jupyter-deploy/role=components",
+				helmSetFlag, "webApp.nodeSelector.jupyter-deploy/role=web-ui",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir := filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
@@ -196,7 +196,7 @@ var _ = Describe("Web App", func() {
 
 			// Default cookieExpire is "8h" = 28800s
 			args := append(oidcRequiredArgs(),
-				"--set", "webApp.enabled=true",
+				helmSetFlag, "webApp.enabled=true",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir := filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
@@ -244,7 +244,7 @@ var _ = Describe("Web App", func() {
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 
 			args := append(oidcRequiredArgs(),
-				"--set", "webApp.enabled=true",
+				helmSetFlag, "webApp.enabled=true",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir := filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
@@ -274,11 +274,11 @@ var _ = Describe("Web App", func() {
 			out, err := exec.Command("helm", "dependency", "build", chartDir).CombinedOutput()
 			Expect(err).NotTo(HaveOccurred(), "helm dependency build failed: %s", string(out))
 
-			args := append([]string{"template", helmReleaseName, chartDir},
+			args := append([]string{helmTemplateCmd, helmReleaseName, chartDir},
 				oidcRequiredArgs()...)
 			args = append(args,
-				"--set", "webApp.enabled=true",
-				"--set", "webApp.clusterAccess.clusterName=test-cluster",
+				helmSetFlag, "webApp.enabled=true",
+				helmSetFlag, "webApp.clusterAccess.clusterName=test-cluster",
 				// apiServer intentionally left empty (default "")
 			)
 

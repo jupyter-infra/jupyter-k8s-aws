@@ -54,8 +54,8 @@ var _ = Describe("Network Policy Consistency", func() {
 
 		// Render with every behind-traefik component enabled.
 		args := append(oidcRequiredArgs(),
-			"--set", "webApp.enabled=true",
-			"--set", "authmiddleware.enabled=true",
+			helmSetFlag, "webApp.enabled=true",
+			helmSetFlag, "authmiddleware.enabled=true",
 		)
 		helmTemplate(chartDir, outputDir, args...)
 		templatesDir := filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")

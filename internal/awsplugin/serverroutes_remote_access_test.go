@@ -25,6 +25,7 @@ const (
 	testVscodeRemote    = "vscode-remote"
 	testKiroRemote      = "kiro-remote"
 	testSSMDocName      = "my-ssm-document"
+	testSSMDocKey       = "ssmDocumentName"
 )
 
 func newTestSSMClient(mockSSM *MockSSMClient) *SSMClient {
@@ -133,7 +134,7 @@ func TestAWSRemoteAccessRoutes_CreateSession_Success(t *testing.T) {
 		Namespace:      testRemoteNamespace,
 		ConnectionType: testVscodeRemote,
 		ConnectionContext: map[string]string{
-			"ssmDocumentName": testSSMDocName,
+			testSSMDocKey: testSSMDocName,
 		},
 	})
 
@@ -170,7 +171,7 @@ func TestAWSRemoteAccessRoutes_CreateSession_MissingDocumentName(t *testing.T) {
 	})
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "ssmDocumentName")
+	assert.Contains(t, err.Error(), testSSMDocKey)
 }
 
 func TestAWSRemoteAccessRoutes_CreateSession_InstanceNotFound(t *testing.T) {
@@ -190,7 +191,7 @@ func TestAWSRemoteAccessRoutes_CreateSession_InstanceNotFound(t *testing.T) {
 		Namespace:      testRemoteNamespace,
 		ConnectionType: testVscodeRemote,
 		ConnectionContext: map[string]string{
-			"ssmDocumentName": "my-doc",
+			testSSMDocKey: "my-doc",
 		},
 	})
 
@@ -227,7 +228,7 @@ func TestAWSRemoteAccessRoutes_CreateSession_KiroRemote(t *testing.T) {
 		Namespace:      testRemoteNamespace,
 		ConnectionType: testKiroRemote,
 		ConnectionContext: map[string]string{
-			"ssmDocumentName": testSSMDocName,
+			testSSMDocKey: testSSMDocName,
 		},
 	})
 
@@ -267,7 +268,7 @@ func TestAWSRemoteAccessRoutes_CreateSession_CursorRemote(t *testing.T) {
 		Namespace:      testRemoteNamespace,
 		ConnectionType: "cursor-remote",
 		ConnectionContext: map[string]string{
-			"ssmDocumentName": testSSMDocName,
+			testSSMDocKey: testSSMDocName,
 		},
 	})
 
@@ -306,7 +307,7 @@ func TestAWSRemoteAccessRoutes_CreateSession_UnknownRemoteType(t *testing.T) {
 		Namespace:      testRemoteNamespace,
 		ConnectionType: "windsurf-remote",
 		ConnectionContext: map[string]string{
-			"ssmDocumentName": testSSMDocName,
+			testSSMDocKey: testSSMDocName,
 		},
 	})
 
@@ -345,8 +346,8 @@ func TestAWSRemoteAccessRoutes_CreateSession_SchemeOverrideViaContext(t *testing
 		Namespace:      testRemoteNamespace,
 		ConnectionType: testKiroRemote,
 		ConnectionContext: map[string]string{
-			"ssmDocumentName": testSSMDocName,
-			"kiroScheme":      "kiro://custom.kiro.dev/workspace",
+			testSSMDocKey: testSSMDocName,
+			"kiroScheme":  "kiro://custom.kiro.dev/workspace",
 		},
 	})
 
@@ -366,7 +367,7 @@ func TestAWSRemoteAccessRoutes_CreateSession_EmptyConnectionType(t *testing.T) {
 		Namespace:      testRemoteNamespace,
 		ConnectionType: "",
 		ConnectionContext: map[string]string{
-			"ssmDocumentName": testSSMDocName,
+			testSSMDocKey: testSSMDocName,
 		},
 	})
 
