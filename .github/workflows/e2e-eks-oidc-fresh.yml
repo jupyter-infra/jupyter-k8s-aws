@@ -109,7 +109,7 @@ jobs:
         run: cd jupyter-deploy && uv sync --all-packages
 
       - name: Set JD venv as active
-        run: echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/jupyter-deploy/.venv" >> $GITHUB_ENV
+        run: echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/jupyter-deploy/.venv" >> "$GITHUB_ENV"
 
       - name: Restore CI project
         run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci
@@ -163,7 +163,7 @@ jobs:
         run: cd jupyter-deploy && uv sync --all-packages
 
       - name: Set JD venv as active
-        run: echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/jupyter-deploy/.venv" >> $GITHUB_ENV
+        run: echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/jupyter-deploy/.venv" >> "$GITHUB_ENV"
 
       - name: Restore CI project
         run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci
@@ -171,7 +171,7 @@ jobs:
       - name: Generate .env
         run: >-
           JD_DIR=jupyter-deploy just env-setup-eks "" sandbox-ci 3
-          "org=jupyter-infra,team=kube2-access,rbac-team=kube2-access,admin-roles=[\"Admin\",\"jupyter-k8s-aws-ci-e2e-fresh\"]"
+          "org=jupyter-infra,team=kube2-access,rbac-team=kube2-access,admin-roles=[\"Admin\",\"jupyter-k8s-aws-ci-e2e-52ed8fab\"]"
 
       - name: Import auth state
         run: JD_DIR=jupyter-deploy just auth-import sandbox-ci
@@ -250,6 +250,7 @@ jobs:
       test-filter: ${{ inputs.test-filter }}
       ref: ${{ inputs.ref }}
       ecr-tag: ${{ needs.build-image.outputs.ecr-tag }}
+      oauth-app-num: 3
       timeout-minutes: 120
     permissions:
       id-token: write
@@ -263,6 +264,7 @@ jobs:
       test-filter: ${{ inputs.test-filter }}
       ref: ${{ inputs.ref }}
       ecr-tag: ${{ needs.build-image.outputs.ecr-tag }}
+      oauth-app-num: 3
       marker: mutating
       mutate: true
       timeout-minutes: 60
@@ -316,7 +318,7 @@ jobs:
         run: cd jupyter-deploy && uv sync --all-packages
 
       - name: Set JD venv as active
-        run: echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/jupyter-deploy/.venv" >> $GITHUB_ENV
+        run: echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/jupyter-deploy/.venv" >> "$GITHUB_ENV"
 
       - name: Restore CI project
         run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci

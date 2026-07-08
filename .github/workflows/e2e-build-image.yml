@@ -56,7 +56,7 @@ jobs:
         run: cd jupyter-deploy && uv sync --all-packages
 
       - name: Set JD venv as active
-        run: echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/jupyter-deploy/.venv" >> $GITHUB_ENV
+        run: echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/jupyter-deploy/.venv" >> "$GITHUB_ENV"
 
       - name: Restore CI project
         run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci

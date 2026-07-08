@@ -32,6 +32,11 @@ on:
         description: "ECR image tag to pull"
         required: true
         type: string
+      oauth-app-num:
+        description: "OAuth app slot number (1-6)"
+        required: false
+        type: number
+        default: 3
 
 jobs:
   test:
@@ -75,35 +80,39 @@ jobs:
         run: cd jupyter-deploy && uv sync --all-packages
 
       - name: Set JD venv as active
-        run: echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/jupyter-deploy/.venv" >> $GITHUB_ENV
+        run: echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/jupyter-deploy/.venv" >> "$GITHUB_ENV"
 
       - name: Restore CI project
         run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci
 
       - name: Restore EKS project
-        run: JD_DIR=jupyter-deploy just ci-restore-eks 3 sandbox-ci sandbox-e2e
+        run: JD_DIR=jupyter-deploy just ci-restore-eks ${{ inputs.oauth-app-num }} sandbox-ci sandbox-e2e
 
       - name: Generate .env
         run: >-
-          JD_DIR=jupyter-deploy just env-setup-eks sandbox-e2e sandbox-ci 3
-          "org=jupyter-infra,team=kube2-access,rbac-team=kube2-access,admin-roles=[\"Admin\",\"jupyter-k8s-aws-ci-e2e-fresh\"]"
+          JD_DIR=jupyter-deploy just env-setup-eks sandbox-e2e sandbox-ci ${{ inputs.oauth-app-num }}
+          "org=jupyter-infra,team=kube2-access,rbac-team=kube2-access,admin-roles=[\"Admin\",\"jupyter-k8s-aws-ci-e2e-52ed8fab\"]"
 
       - name: Import auth state
         run: JD_DIR=jupyter-deploy just auth-import sandbox-ci
 
       - name: Pull E2E image
-        run: JD_DIR=jupyter-deploy just ci-e2e-pull 3 ${{ inputs.ecr-tag }} sandbox-ci
+        run: JD_DIR=jupyter-deploy just ci-e2e-pull ${{ inputs.oauth-app-num }} ${{ inputs.ecr-tag }} sandbox-ci
 
       - name: Build test filter
         id: filter
+        env:
+          TEST_FILTER: ${{ inputs.test-filter }}
+          MARKER: ${{ inputs.marker }}
+          MUTATE: ${{ inputs.mutate }}
         run: |
-          FILTER="${{ inputs.test-filter }}"
+          FILTER="$TEST_FILTER"
           OPTIONS="ci-dir=sandbox-ci,skip-sync=true"
-          if [ "${{ inputs.mutate }}" = "true" ]; then
+          if [ "$MUTATE" = "true" ]; then
             OPTIONS="mutate=true,${OPTIONS}"
           fi
-          if [ -n "${{ inputs.marker }}" ]; then
-            OPTIONS="marker=${{ inputs.marker }},${OPTIONS}"
+          if [ -n "$MARKER" ]; then
+            OPTIONS="marker=${MARKER},${OPTIONS}"
           fi
           echo "filter=${FILTER}" >> "$GITHUB_OUTPUT"
           echo "options=${OPTIONS}" >> "$GITHUB_OUTPUT"
@@ -129,4 +138,4 @@ jobs:
       - name: Upload test results to S3
         if: failure()
         continue-on-error: true
-        run: JD_DIR=jupyter-deploy just ci-upload-test-results 3 sandbox-ci
+        run: JD_DIR=jupyter-deploy just ci-upload-test-results ${{ inputs.oauth-app-num }} sandbox-ci
