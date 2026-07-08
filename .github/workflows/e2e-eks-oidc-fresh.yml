@@ -171,7 +171,7 @@ jobs:
       - name: Generate .env
         run: >-
           JD_DIR=jupyter-deploy just env-setup-eks "" sandbox-ci 3
-          "org=jupyter-infra,team=kube2-access,rbac-team=kube2-access,admin-roles=[\"Admin\",\"jupyter-k8s-aws-ci-e2e-52ed8fab\"]"
+          "org=jupyter-infra,team=jupyter-k8s-aws-e2e-app-access,rbac-team=jupyter-k8s-aws-e2e-app-access,admin-roles=[\"Admin\",\"DeployRole\",\"jupyter-k8s-aws-ci-e2e-52ed8fab\"]"
 
       - name: Import auth state
         run: JD_DIR=jupyter-deploy just auth-import sandbox-ci
