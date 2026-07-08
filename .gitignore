@@ -36,3 +36,15 @@ dist/
 
 # Helm downloaded dependencies
 charts/*/charts/*.tgz
+
+# CI local project directories (JD cluster state)
+sandbox-*/
+.auth/
+
+# CI Python venv
+ci/.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
