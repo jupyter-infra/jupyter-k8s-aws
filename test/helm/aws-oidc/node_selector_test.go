@@ -209,7 +209,7 @@ func helmTemplate(chartDir, outputDir string, extraArgs ...string) {
 	out, err := exec.Command("helm", "dependency", "build", chartDir).CombinedOutput()
 	Expect(err).NotTo(HaveOccurred(), "helm dependency build failed: %s", string(out))
 
-	args := append([]string{"template", "jk8s", chartDir, "--output-dir", outputDir}, extraArgs...)
+	args := append([]string{"template", helmReleaseName, chartDir, "--output-dir", outputDir}, extraArgs...)
 	out, err = exec.Command("helm", args...).CombinedOutput()
 	Expect(err).NotTo(HaveOccurred(), "helm template failed: %s", string(out))
 }

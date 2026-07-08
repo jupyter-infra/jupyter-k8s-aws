@@ -15,6 +15,9 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// helmReleaseName is the release name used when rendering the chart in tests.
+const helmReleaseName = "jk8s"
+
 // oidcRequiredArgs returns the standard helm values needed to render the
 // aws-oidc chart in tests.
 func oidcRequiredArgs() []string {

@@ -18,6 +18,15 @@ import (
 	pluginapi "github.com/jupyter-infra/jupyter-k8s-plugin/api"
 )
 
+const (
+	testRemotePodUID    = "pod-uid-123"
+	testRemoteWorkspace = "my-workspace"
+	testRemoteNamespace = "default"
+	testVscodeRemote    = "vscode-remote"
+	testKiroRemote      = "kiro-remote"
+	testSSMDocName      = "my-ssm-document"
+)
+
 func newTestSSMClient(mockSSM *MockSSMClient) *SSMClient {
 	return NewSSMClientWithMock(mockSSM, "us-west-2")
 }
@@ -34,9 +43,9 @@ func TestAWSRemoteAccessRoutes_RegisterNodeAgent_Success(t *testing.T) {
 	handler := NewAWSRemoteAccessRoutes(newTestSSMClient(mockSSM))
 
 	resp, err := handler.RegisterNodeAgent(context.Background(), &pluginapi.RegisterNodeAgentRequest{
-		PodUID:        "pod-uid-123",
-		WorkspaceName: "my-workspace",
-		Namespace:     "default",
+		PodUID:        testRemotePodUID,
+		WorkspaceName: testRemoteWorkspace,
+		Namespace:     testRemoteNamespace,
 		PodEventsContext: map[string]string{
 			"ssmManagedNodeRole": "arn:aws:iam::123456789012:role/SSMRole",
 		},
@@ -52,9 +61,9 @@ func TestAWSRemoteAccessRoutes_RegisterNodeAgent_MissingRole(t *testing.T) {
 	handler := NewAWSRemoteAccessRoutes(newTestSSMClient(new(MockSSMClient)))
 
 	_, err := handler.RegisterNodeAgent(context.Background(), &pluginapi.RegisterNodeAgentRequest{
-		PodUID:           "pod-uid-123",
-		WorkspaceName:    "my-workspace",
-		Namespace:        "default",
+		PodUID:           testRemotePodUID,
+		WorkspaceName:    testRemoteWorkspace,
+		Namespace:        testRemoteNamespace,
 		PodEventsContext: map[string]string{},
 	})
 
@@ -82,7 +91,7 @@ func TestAWSRemoteAccessRoutes_DeregisterNodeAgent_Success(t *testing.T) {
 	handler := NewAWSRemoteAccessRoutes(newTestSSMClient(mockSSM))
 
 	resp, err := handler.DeregisterNodeAgent(context.Background(), &pluginapi.DeregisterNodeAgentRequest{
-		PodUID: "pod-uid-123",
+		PodUID: testRemotePodUID,
 	})
 
 	assert.NoError(t, err)
@@ -119,22 +128,22 @@ func TestAWSRemoteAccessRoutes_CreateSession_Success(t *testing.T) {
 	handler := NewAWSRemoteAccessRoutes(newTestSSMClient(mockSSM))
 
 	resp, err := handler.CreateSession(context.Background(), &pluginapi.CreateSessionRequest{
-		PodUID:         "pod-uid-123",
-		WorkspaceName:  "my-workspace",
-		Namespace:      "default",
-		ConnectionType: "vscode-remote",
+		PodUID:         testRemotePodUID,
+		WorkspaceName:  testRemoteWorkspace,
+		Namespace:      testRemoteNamespace,
+		ConnectionType: testVscodeRemote,
 		ConnectionContext: map[string]string{
-			"ssmDocumentName": "my-ssm-document",
+			"ssmDocumentName": testSSMDocName,
 		},
 	})
 
 	assert.NoError(t, err)
 	assert.Contains(t, resp.ConnectionURL, "sess-abc")
-	assert.Contains(t, resp.ConnectionURL, connectionScheme("vscode-remote").Default)
+	assert.Contains(t, resp.ConnectionURL, connectionScheme(testVscodeRemote).Default)
 	assert.Contains(t, resp.ConnectionURL, "streamUrl=wss://stream.example.com")
 	assert.Contains(t, resp.ConnectionURL, "sessionToken=token-xyz")
-	assert.Contains(t, resp.ConnectionURL, "workspaceName=my-workspace")
-	assert.Contains(t, resp.ConnectionURL, "namespace=default")
+	assert.Contains(t, resp.ConnectionURL, "workspaceName="+testRemoteWorkspace)
+	assert.Contains(t, resp.ConnectionURL, "namespace="+testRemoteNamespace)
 	mockSSM.AssertExpectations(t)
 }
 
@@ -153,10 +162,10 @@ func TestAWSRemoteAccessRoutes_CreateSession_MissingDocumentName(t *testing.T) {
 	handler := NewAWSRemoteAccessRoutes(newTestSSMClient(mockSSM))
 
 	_, err := handler.CreateSession(context.Background(), &pluginapi.CreateSessionRequest{
-		PodUID:            "pod-uid-123",
-		WorkspaceName:     "my-workspace",
-		Namespace:         "default",
-		ConnectionType:    "vscode-remote",
+		PodUID:            testRemotePodUID,
+		WorkspaceName:     testRemoteWorkspace,
+		Namespace:         testRemoteNamespace,
+		ConnectionType:    testVscodeRemote,
 		ConnectionContext: map[string]string{},
 	})
 
@@ -176,10 +185,10 @@ func TestAWSRemoteAccessRoutes_CreateSession_InstanceNotFound(t *testing.T) {
 	handler := NewAWSRemoteAccessRoutes(newTestSSMClient(mockSSM))
 
 	_, err := handler.CreateSession(context.Background(), &pluginapi.CreateSessionRequest{
-		PodUID:         "pod-uid-123",
-		WorkspaceName:  "my-workspace",
-		Namespace:      "default",
-		ConnectionType: "vscode-remote",
+		PodUID:         testRemotePodUID,
+		WorkspaceName:  testRemoteWorkspace,
+		Namespace:      testRemoteNamespace,
+		ConnectionType: testVscodeRemote,
 		ConnectionContext: map[string]string{
 			"ssmDocumentName": "my-doc",
 		},
@@ -213,12 +222,12 @@ func TestAWSRemoteAccessRoutes_CreateSession_KiroRemote(t *testing.T) {
 	handler := NewAWSRemoteAccessRoutes(newTestSSMClient(mockSSM))
 
 	resp, err := handler.CreateSession(context.Background(), &pluginapi.CreateSessionRequest{
-		PodUID:         "pod-uid-123",
-		WorkspaceName:  "my-workspace",
-		Namespace:      "default",
-		ConnectionType: "kiro-remote",
+		PodUID:         testRemotePodUID,
+		WorkspaceName:  testRemoteWorkspace,
+		Namespace:      testRemoteNamespace,
+		ConnectionType: testKiroRemote,
 		ConnectionContext: map[string]string{
-			"ssmDocumentName": "my-ssm-document",
+			"ssmDocumentName": testSSMDocName,
 		},
 	})
 
@@ -253,12 +262,12 @@ func TestAWSRemoteAccessRoutes_CreateSession_CursorRemote(t *testing.T) {
 	handler := NewAWSRemoteAccessRoutes(newTestSSMClient(mockSSM))
 
 	resp, err := handler.CreateSession(context.Background(), &pluginapi.CreateSessionRequest{
-		PodUID:         "pod-uid-123",
-		WorkspaceName:  "my-workspace",
-		Namespace:      "default",
+		PodUID:         testRemotePodUID,
+		WorkspaceName:  testRemoteWorkspace,
+		Namespace:      testRemoteNamespace,
 		ConnectionType: "cursor-remote",
 		ConnectionContext: map[string]string{
-			"ssmDocumentName": "my-ssm-document",
+			"ssmDocumentName": testSSMDocName,
 		},
 	})
 
@@ -292,12 +301,12 @@ func TestAWSRemoteAccessRoutes_CreateSession_UnknownRemoteType(t *testing.T) {
 	handler := NewAWSRemoteAccessRoutes(newTestSSMClient(mockSSM))
 
 	resp, err := handler.CreateSession(context.Background(), &pluginapi.CreateSessionRequest{
-		PodUID:         "pod-uid-123",
-		WorkspaceName:  "my-workspace",
-		Namespace:      "default",
+		PodUID:         testRemotePodUID,
+		WorkspaceName:  testRemoteWorkspace,
+		Namespace:      testRemoteNamespace,
 		ConnectionType: "windsurf-remote",
 		ConnectionContext: map[string]string{
-			"ssmDocumentName": "my-ssm-document",
+			"ssmDocumentName": testSSMDocName,
 		},
 	})
 
@@ -331,12 +340,12 @@ func TestAWSRemoteAccessRoutes_CreateSession_SchemeOverrideViaContext(t *testing
 	handler := NewAWSRemoteAccessRoutes(newTestSSMClient(mockSSM))
 
 	resp, err := handler.CreateSession(context.Background(), &pluginapi.CreateSessionRequest{
-		PodUID:         "pod-uid-123",
-		WorkspaceName:  "my-workspace",
-		Namespace:      "default",
-		ConnectionType: "kiro-remote",
+		PodUID:         testRemotePodUID,
+		WorkspaceName:  testRemoteWorkspace,
+		Namespace:      testRemoteNamespace,
+		ConnectionType: testKiroRemote,
 		ConnectionContext: map[string]string{
-			"ssmDocumentName": "my-ssm-document",
+			"ssmDocumentName": testSSMDocName,
 			"kiroScheme":      "kiro://custom.kiro.dev/workspace",
 		},
 	})
@@ -352,12 +361,12 @@ func TestAWSRemoteAccessRoutes_CreateSession_EmptyConnectionType(t *testing.T) {
 	handler := NewAWSRemoteAccessRoutes(newTestSSMClient(mockSSM))
 
 	_, err := handler.CreateSession(context.Background(), &pluginapi.CreateSessionRequest{
-		PodUID:         "pod-uid-123",
-		WorkspaceName:  "my-workspace",
-		Namespace:      "default",
+		PodUID:         testRemotePodUID,
+		WorkspaceName:  testRemoteWorkspace,
+		Namespace:      testRemoteNamespace,
 		ConnectionType: "",
 		ConnectionContext: map[string]string{
-			"ssmDocumentName": "my-ssm-document",
+			"ssmDocumentName": testSSMDocName,
 		},
 	})
 
@@ -371,8 +380,8 @@ func TestConnectionScheme(t *testing.T) {
 		expectedKey    string
 		expectedScheme string
 	}{
-		{"vscode-remote", "vscodeScheme", "vscode://amazonwebservices.aws-toolkit-vscode/connect/workspace"},
-		{"kiro-remote", "kiroScheme", "kiro://amazonwebservices.aws-toolkit-vscode/connect/workspace"},
+		{testVscodeRemote, "vscodeScheme", "vscode://amazonwebservices.aws-toolkit-vscode/connect/workspace"},
+		{testKiroRemote, "kiroScheme", "kiro://amazonwebservices.aws-toolkit-vscode/connect/workspace"},
 		{"cursor-remote", "cursorScheme", "cursor://amazonwebservices.aws-toolkit-vscode/connect/workspace"},
 		{"windsurf-remote", "windsurfScheme", "windsurf://amazonwebservices.aws-toolkit-vscode/connect/workspace"},
 	}

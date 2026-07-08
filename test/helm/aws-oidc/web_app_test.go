@@ -30,22 +30,6 @@ var _ = Describe("Web App", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	// requiredArgs returns the standard helm values needed for all renders.
-	requiredArgs := func() []string {
-		return []string{
-			"--set", "domain=test.example.com",
-			"--set", "certManager.email=admin@example.com",
-			"--set", "storageClass.efs.parameters.fileSystemId=fs-000",
-			"--set", "github.clientId=cid",
-			"--set", "github.clientSecret=csec",
-			"--set", "github.orgs[0].name=org",
-			"--set", "github.orgs[0].teams[0]=t",
-			"--set", "githubRbac.orgs[0].name=org",
-			"--set", "githubRbac.orgs[0].teams[0]=t",
-			"--set", "oauth2Proxy.cookieSecret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-		}
-	}
-
 	// getEnvVar finds an env var by name in a container's env list.
 	getEnvVar := func(envList []corev1.EnvVar, name string) (string, bool) {
 		for _, e := range envList {
@@ -67,7 +51,7 @@ var _ = Describe("Web App", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 
-			args := append(requiredArgs(),
+			args := append(oidcRequiredArgs(),
 				"--set", "webApp.enabled=true",
 				"--set", "webApp.clusterAccess.clusterName=test-cluster",
 				"--set", "webApp.clusterAccess.apiServer=https://api.test-cluster.example.com",
@@ -131,7 +115,7 @@ var _ = Describe("Web App", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 
-			args := append(requiredArgs(),
+			args := append(oidcRequiredArgs(),
 				"--set", "webApp.enabled=true",
 			)
 			helmTemplate(chartDir, outputDir, args...)
@@ -183,7 +167,7 @@ var _ = Describe("Web App", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 
-			args := append(requiredArgs(),
+			args := append(oidcRequiredArgs(),
 				"--set", "webApp.enabled=true",
 				"--set", "nodeSelector.jupyter-deploy/role=components",
 				"--set", "webApp.nodeSelector.jupyter-deploy/role=web-ui",
@@ -211,7 +195,7 @@ var _ = Describe("Web App", func() {
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 
 			// Default cookieExpire is "8h" = 28800s
-			args := append(requiredArgs(),
+			args := append(oidcRequiredArgs(),
 				"--set", "webApp.enabled=true",
 			)
 			helmTemplate(chartDir, outputDir, args...)
@@ -259,7 +243,7 @@ var _ = Describe("Web App", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 
-			args := append(requiredArgs(),
+			args := append(oidcRequiredArgs(),
 				"--set", "webApp.enabled=true",
 			)
 			helmTemplate(chartDir, outputDir, args...)
@@ -290,8 +274,8 @@ var _ = Describe("Web App", func() {
 			out, err := exec.Command("helm", "dependency", "build", chartDir).CombinedOutput()
 			Expect(err).NotTo(HaveOccurred(), "helm dependency build failed: %s", string(out))
 
-			args := append([]string{"template", "jk8s", chartDir},
-				requiredArgs()...)
+			args := append([]string{"template", helmReleaseName, chartDir},
+				oidcRequiredArgs()...)
 			args = append(args,
 				"--set", "webApp.enabled=true",
 				"--set", "webApp.clusterAccess.clusterName=test-cluster",

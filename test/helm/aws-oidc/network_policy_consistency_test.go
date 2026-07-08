@@ -35,21 +35,6 @@ var _ = Describe("Network Policy Consistency", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	requiredArgs := func() []string {
-		return []string{
-			"--set", "domain=test.example.com",
-			"--set", "certManager.email=admin@example.com",
-			"--set", "storageClass.efs.parameters.fileSystemId=fs-000",
-			"--set", "github.clientId=cid",
-			"--set", "github.clientSecret=csec",
-			"--set", "github.orgs[0].name=org",
-			"--set", "github.orgs[0].teams[0]=t",
-			"--set", "githubRbac.orgs[0].name=org",
-			"--set", "githubRbac.orgs[0].teams[0]=t",
-			"--set", "oauth2Proxy.cookieSecret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-		}
-	}
-
 	// The full set of behind-traefik components. Adding a fifth component that
 	// sits behind traefik should mean adding a row here — that is intentional
 	// friction so the shared invariants are a conscious decision.
@@ -68,7 +53,7 @@ var _ = Describe("Network Policy Consistency", func() {
 		copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 
 		// Render with every behind-traefik component enabled.
-		args := append(requiredArgs(),
+		args := append(oidcRequiredArgs(),
 			"--set", "webApp.enabled=true",
 			"--set", "authmiddleware.enabled=true",
 		)

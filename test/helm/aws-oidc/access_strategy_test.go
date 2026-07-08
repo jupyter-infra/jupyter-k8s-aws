@@ -291,7 +291,7 @@ var _ = Describe("Access Strategy", func() {
 			out, err := exec.Command("helm", "dependency", "build", chartDir).CombinedOutput()
 			Expect(err).NotTo(HaveOccurred(), "helm dependency build failed: %s", string(out))
 
-			args := append([]string{"template", "jk8s", chartDir, "--output-dir", outputDir},
+			args := append([]string{"template", helmReleaseName, chartDir, "--output-dir", outputDir},
 				minimalOIDCArgs[:]...,
 			)
 			args = append(args,
