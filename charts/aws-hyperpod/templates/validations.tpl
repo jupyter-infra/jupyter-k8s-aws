@@ -27,6 +27,10 @@
 {{- fail "directSSH.domain is required when directSSH.enabled is true" }}
 {{- end }}
 
+{{- if and .Values.directSSH.enabled (or (lt (.Values.directSSH.port | int) 1) (gt (.Values.directSSH.port | int) 65535)) }}
+{{- fail "directSSH.port must be between 1 and 65535" }}
+{{- end }}
+
 {{- if and .Values.directSSH.enabled .Values.remoteAccess.enabled }}
 {{- fail "directSSH and remoteAccess are mutually exclusive. Enable only one." }}
 {{- end }}
