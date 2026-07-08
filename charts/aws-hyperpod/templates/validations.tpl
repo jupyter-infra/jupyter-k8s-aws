@@ -23,6 +23,14 @@
 {{- fail "remoteAccess.ssmSidecarImage.tag is required when remoteAccess.enabled is true" }}
 {{- end }}
 
+{{- if and .Values.directSSH.enabled (not .Values.directSSH.domain) }}
+{{- fail "directSSH.domain is required when directSSH.enabled is true" }}
+{{- end }}
+
+{{- if and .Values.directSSH.enabled .Values.remoteAccess.enabled }}
+{{- fail "directSSH and remoteAccess are mutually exclusive. Enable only one." }}
+{{- end }}
+
 {{/* Validate rotator and JWT configuration when clusterWebUI is enabled */}}
 {{- if .Values.clusterWebUI.enabled }}
 

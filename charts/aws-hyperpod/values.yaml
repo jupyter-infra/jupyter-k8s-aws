@@ -125,6 +125,20 @@ remoteAccess:
   remoteAccessServerScript: "/opt/amazon/sagemaker/workspace/remote-access/start-remote-access-server.sh"
   remoteAccessServerPort: "2222"
 
+# Direct SSH access configuration
+directSSH:
+  enabled: false
+
+  # Route53 Private Hosted Zone domain for workspace SSH hostnames (required)
+  # Workspace hostname format: {workspace-name}.{namespace}.{domain}
+  domain: ""
+
+  # Init container image carrying OpenSSH binaries (managed by service team)
+  initImage:
+    containerRegistry: ""
+    repository: ""
+    tag: ""
+
 # [STORAGE] StorageClasses for Workspaces
 storageClass:
   ebs:
