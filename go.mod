@@ -1,6 +1,6 @@
 module github.com/jupyter-infra/jupyter-k8s-aws
 
-go 1.24.5
+go 1.26.0
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.5

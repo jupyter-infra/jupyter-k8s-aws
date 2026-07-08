@@ -112,7 +112,7 @@ var _ = Describe("AWS HyperPod Resources", func() {
 		}
 		Expect(found).To(BeTrue(), "ClusterRole not found in authmiddleware rbac.yaml")
 
-		resourceNames := []string{}
+		resourceNames := make([]string, 0, len(clusterRole.Rules))
 		for _, rule := range clusterRole.Rules {
 			resourceNames = append(resourceNames, rule.Resources...)
 		}
