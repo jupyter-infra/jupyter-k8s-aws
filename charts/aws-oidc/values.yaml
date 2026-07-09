@@ -8,7 +8,7 @@ tolerations: []
 # Init container image used for readiness checks
 initImage:
   repository: docker.io/busybox
-  tag: "1.37"
+  tag: "1.38"
 
 # Default namespace for Traefik Middlewares and other resources
 # This should be left as the default for normal operation
@@ -64,7 +64,7 @@ traefik:
   # Traefik deployment image name
   imageName: traefik
   # Traefik deployment image tag
-  imageTag: v3.7.5
+  imageTag: v3.7.7
   # Number of traefik replicas
   replicas: 1
   # Redirect HTTP to HTTPS
@@ -226,7 +226,7 @@ webApp:
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-ui
-  imageTag: v0.1.2
+  imageTag: v0.1.3
   # Kubernetes namespace where workspaces are created and managed
   namespace: default
   resources:
@@ -275,7 +275,7 @@ authmiddleware:
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-authmiddleware
-  imageTag: v0.1.2
+  imageTag: v0.2.0
   # Resource limits and requests
   resources:
     limits:
@@ -327,7 +327,7 @@ rotator:
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-rotator
-  imageTag: v0.1.2
+  imageTag: v0.2.0
   # Rotation interval (how often to rotate keys)
   # Must be parseable as a duration (e.g., "15m", "1h")
   rotationInterval: "15m"

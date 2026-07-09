@@ -259,10 +259,10 @@ kubectl-aws: ## Configure kubectl to use remote cluster
 
 .PHONY: deploy-aws-oidc
 deploy-aws-oidc: setup-aws ## Deploy aws-oidc chart (reuses existing Helm values from JD)
-	@echo "Upgrading aws-oidc chart with --reuse-values..."
+	@echo "Upgrading aws-oidc chart with --reset-then-reuse-values..."
 	helm upgrade jupyter-k8s-aws-oidc $(CHART_OIDC) \
 		-n jupyter-k8s-router \
-		--reuse-values \
+		--reset-then-reuse-values \
 		$(HELM_EXTRA_ARGS)
 	@( \
 		set -e; \
@@ -283,10 +283,10 @@ deploy-aws-oidc: setup-aws ## Deploy aws-oidc chart (reuses existing Helm values
 
 .PHONY: deploy-aws-hyperpod
 deploy-aws-hyperpod: setup-aws ## Deploy aws-hyperpod chart (reuses existing Helm values from JD)
-	@echo "Upgrading aws-hyperpod chart with --reuse-values..."
+	@echo "Upgrading aws-hyperpod chart with --reset-then-reuse-values..."
 	helm upgrade aws-hyperpod $(CHART_HYPERPOD) \
 		-n jupyter-k8s-system \
-		--reuse-values \
+		--reset-then-reuse-values \
 		$(HELM_EXTRA_ARGS)
 	@echo "Restarting authmiddleware deployment to pick up chart changes..."
 	-kubectl rollout restart deployment -n jupyter-k8s-system workspace-auth-middleware 2>/dev/null || true

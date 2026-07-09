@@ -2,11 +2,15 @@ apiVersion: v2
 name: jupyter-k8s-aws-oidc
 description: AWS OIDC extension for jupyter-k8s (Traefik + Dex + OAuth2-Proxy)
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.1.1
+appVersion: "0.1.1"
 icon: "https://example.com/icon.png"
 
 # Dependencies
 # Require traefik CRDs to be installed (https://traefik.github.io/charts)
 # Not adding as a dependency because of `helm` install issues
 # Run `helm upgrade --install traefik-crd traefik/traefik-crds --version 1.15.0` first
+# NOTE: Do not bump past 1.15.0 — the traefik-crds chart bundles ~2.9MB of unused
+# Gateway API/Knative CRD source files that count against Helm's 1MB release-Secret
+# limit. 1.18.0 exceeds it. The traefik.io CRD schema is stable across these minors
+# and forward-compatible with Traefik v3.7.x.
