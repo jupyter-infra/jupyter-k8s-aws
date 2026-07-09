@@ -30,9 +30,9 @@ var _ = Describe("GitHub RBAC", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			args := append(minimalOIDCArgs,
-				"--set", "githubRbac.namespace=jupyter-workspaces",
-				"--set", "githubRbac.orgs[0].name=some-org",
-				"--set", "githubRbac.orgs[0].teams[0]=devs",
+				helmSetFlag, "githubRbac.namespace=jupyter-workspaces",
+				helmSetFlag, "githubRbac.orgs[0].name=some-org",
+				helmSetFlag, "githubRbac.orgs[0].teams[0]=devs",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
@@ -99,8 +99,8 @@ var _ = Describe("GitHub RBAC", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			args := append(minimalOIDCArgs,
-				"--set", "githubRbac.orgs[0].name=rbac-org",
-				"--set", "githubRbac.orgs[0].teams[0]=rbac-team",
+				helmSetFlag, "githubRbac.orgs[0].name=rbac-org",
+				helmSetFlag, "githubRbac.orgs[0].teams[0]=rbac-team",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")

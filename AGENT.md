@@ -75,8 +75,8 @@ delegate to the sibling jupyter-k8s checkout to deploy the controller.
 ## Development
 
 ### Prerequisites
-- Go 1.24+
-- golangci-lint v2.4+
+- Go 1.26+
+- golangci-lint v2.12+
 - Helm 3
 - Container tool: Finch or Docker
 

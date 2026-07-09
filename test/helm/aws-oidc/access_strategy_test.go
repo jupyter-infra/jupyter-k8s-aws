@@ -16,13 +16,13 @@ import (
 
 // minimalOIDCArgs are the required values for rendering the aws-oidc chart.
 var minimalOIDCArgs = []string{
-	"--set", "domain=test.example.com",
-	"--set", "certManager.email=admin@example.com",
-	"--set", "github.clientId=cid",
-	"--set", "github.clientSecret=csec",
-	"--set", "github.orgs[0].name=some-org",
-	"--set", "github.orgs[0].teams[0]=devs",
-	"--set", "oauth2Proxy.cookieSecret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+	helmSetFlag, "domain=test.example.com",
+	helmSetFlag, "certManager.email=admin@example.com",
+	helmSetFlag, "github.clientId=cid",
+	helmSetFlag, "github.clientSecret=csec",
+	helmSetFlag, "github.orgs[0].name=some-org",
+	helmSetFlag, "github.orgs[0].teams[0]=devs",
+	helmSetFlag, "oauth2Proxy.cookieSecret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
 }
 
 var _ = Describe("Access Strategy", func() {
@@ -46,7 +46,7 @@ var _ = Describe("Access Strategy", func() {
 		})
 
 		It("should render the oauth access strategy", func() {
-			path := filepath.Join(templatesDir, "access-strategy/oauth-access-strategy.yaml")
+			path := filepath.Join(templatesDir, oauthStrategyFile)
 			data, err := os.ReadFile(path)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -62,7 +62,7 @@ var _ = Describe("Access Strategy", func() {
 		})
 
 		It("should not render the bearer access strategy", func() {
-			path := filepath.Join(templatesDir, "access-strategy/bearer-access-strategy.yaml")
+			path := filepath.Join(templatesDir, bearerStrategyFile)
 			_, err := os.ReadFile(path)
 			Expect(os.IsNotExist(err)).To(BeTrue(),
 				"bearer-access-strategy.yaml should not be rendered when createBearer=false")
@@ -77,14 +77,14 @@ var _ = Describe("Access Strategy", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			args := append(minimalOIDCArgs,
-				"--set", "accessStrategy.namespace=jupyter-workspaces",
+				helmSetFlag, "accessStrategy.namespace=jupyter-workspaces",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
 		})
 
 		It("should render the oauth strategy in the custom namespace", func() {
-			path := filepath.Join(templatesDir, "access-strategy/oauth-access-strategy.yaml")
+			path := filepath.Join(templatesDir, oauthStrategyFile)
 			data, err := os.ReadFile(path)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(data)).To(ContainSubstring("namespace: jupyter-workspaces"))
@@ -99,20 +99,20 @@ var _ = Describe("Access Strategy", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			args := append(minimalOIDCArgs,
-				"--set", "accessStrategy.createBearer=true",
-				"--set", "authmiddleware.enableBearerAuth=true",
+				helmSetFlag, "accessStrategy.createBearer=true",
+				helmSetFlag, "authmiddleware.enableBearerAuth=true",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
 		})
 
 		It("should render both access strategies", func() {
-			oauthPath := filepath.Join(templatesDir, "access-strategy/oauth-access-strategy.yaml")
+			oauthPath := filepath.Join(templatesDir, oauthStrategyFile)
 			data, err := os.ReadFile(oauthPath)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(data)).To(ContainSubstring("name: oauth-access-strategy"))
 
-			bearerPath := filepath.Join(templatesDir, "access-strategy/bearer-access-strategy.yaml")
+			bearerPath := filepath.Join(templatesDir, bearerStrategyFile)
 			data, err = os.ReadFile(bearerPath)
 			Expect(err).NotTo(HaveOccurred())
 			content := string(data)
@@ -134,19 +134,19 @@ var _ = Describe("Access Strategy", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			args := append(minimalOIDCArgs,
-				"--set", "accessStrategy.createOAuth=false",
+				helmSetFlag, "accessStrategy.createOAuth=false",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
 		})
 
 		It("should not render any access strategy", func() {
-			oauthPath := filepath.Join(templatesDir, "access-strategy/oauth-access-strategy.yaml")
+			oauthPath := filepath.Join(templatesDir, oauthStrategyFile)
 			_, err := os.ReadFile(oauthPath)
 			Expect(os.IsNotExist(err)).To(BeTrue(),
 				"oauth-access-strategy.yaml should not be rendered when createOAuth=false")
 
-			bearerPath := filepath.Join(templatesDir, "access-strategy/bearer-access-strategy.yaml")
+			bearerPath := filepath.Join(templatesDir, bearerStrategyFile)
 			_, err = os.ReadFile(bearerPath)
 			Expect(os.IsNotExist(err)).To(BeTrue(),
 				"bearer-access-strategy.yaml should not be rendered when createBearer=false")
@@ -161,8 +161,8 @@ var _ = Describe("Access Strategy", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			args := append(minimalOIDCArgs,
-				"--set", "accessStrategy.createBearer=true",
-				"--set", "authmiddleware.enableBearerAuth=true",
+				helmSetFlag, "accessStrategy.createBearer=true",
+				helmSetFlag, "authmiddleware.enableBearerAuth=true",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
@@ -170,8 +170,8 @@ var _ = Describe("Access Strategy", func() {
 
 		It("should preserve Go template variables in rendered output", func() {
 			strategies := []string{
-				"access-strategy/oauth-access-strategy.yaml",
-				"access-strategy/bearer-access-strategy.yaml",
+				oauthStrategyFile,
+				bearerStrategyFile,
 			}
 			for _, s := range strategies {
 				data, err := os.ReadFile(filepath.Join(templatesDir, s))
@@ -193,15 +193,15 @@ var _ = Describe("Access Strategy", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			args := append(minimalOIDCArgs,
-				"--set", "accessStrategy.createBearer=true",
-				"--set", "authmiddleware.enableBearerAuth=true",
+				helmSetFlag, "accessStrategy.createBearer=true",
+				helmSetFlag, "authmiddleware.enableBearerAuth=true",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
 		})
 
 		It("should probe the /auth path for the oauth strategy", func() {
-			data, err := os.ReadFile(filepath.Join(templatesDir, "access-strategy/oauth-access-strategy.yaml"))
+			data, err := os.ReadFile(filepath.Join(templatesDir, oauthStrategyFile))
 			Expect(err).NotTo(HaveOccurred())
 			content := string(data)
 			Expect(content).To(ContainSubstring("/auth"))
@@ -210,7 +210,7 @@ var _ = Describe("Access Strategy", func() {
 		})
 
 		It("should probe the /bearer-auth path for the bearer strategy", func() {
-			data, err := os.ReadFile(filepath.Join(templatesDir, "access-strategy/bearer-access-strategy.yaml"))
+			data, err := os.ReadFile(filepath.Join(templatesDir, bearerStrategyFile))
 			Expect(err).NotTo(HaveOccurred())
 			content := string(data)
 			Expect(content).To(ContainSubstring("/bearer-auth"))
@@ -226,8 +226,8 @@ var _ = Describe("Access Strategy", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			args := append(minimalOIDCArgs,
-				"--set", "accessStrategy.createBearer=true",
-				"--set", "authmiddleware.enableBearerAuth=true",
+				helmSetFlag, "accessStrategy.createBearer=true",
+				helmSetFlag, "authmiddleware.enableBearerAuth=true",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
@@ -235,8 +235,8 @@ var _ = Describe("Access Strategy", func() {
 
 		It("should include NetworkPolicy in both access strategies", func() {
 			strategies := []string{
-				"access-strategy/oauth-access-strategy.yaml",
-				"access-strategy/bearer-access-strategy.yaml",
+				oauthStrategyFile,
+				bearerStrategyFile,
 			}
 			for _, s := range strategies {
 				data, err := os.ReadFile(filepath.Join(templatesDir, s))
@@ -256,9 +256,9 @@ var _ = Describe("Access Strategy", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			args := append(minimalOIDCArgs,
-				"--set", "accessStrategy.createBearer=true",
-				"--set", "authmiddleware.enableBearerAuth=true",
-				"--set", "accessStrategy.createNetworkPolicy=false",
+				helmSetFlag, "accessStrategy.createBearer=true",
+				helmSetFlag, "authmiddleware.enableBearerAuth=true",
+				helmSetFlag, "accessStrategy.createNetworkPolicy=false",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			templatesDir = filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
@@ -266,8 +266,8 @@ var _ = Describe("Access Strategy", func() {
 
 		It("should not include NetworkPolicy but still have IngressRoute", func() {
 			strategies := []string{
-				"access-strategy/oauth-access-strategy.yaml",
-				"access-strategy/bearer-access-strategy.yaml",
+				oauthStrategyFile,
+				bearerStrategyFile,
 			}
 			for _, s := range strategies {
 				data, err := os.ReadFile(filepath.Join(templatesDir, s))
@@ -291,12 +291,12 @@ var _ = Describe("Access Strategy", func() {
 			out, err := exec.Command("helm", "dependency", "build", chartDir).CombinedOutput()
 			Expect(err).NotTo(HaveOccurred(), "helm dependency build failed: %s", string(out))
 
-			args := append([]string{"template", "jk8s", chartDir, "--output-dir", outputDir},
+			args := append([]string{helmTemplateCmd, helmReleaseName, chartDir, "--output-dir", outputDir},
 				minimalOIDCArgs[:]...,
 			)
 			args = append(args,
-				"--set", "accessStrategy.createBearer=true",
-				"--set", "authmiddleware.enableBearerAuth=false",
+				helmSetFlag, "accessStrategy.createBearer=true",
+				helmSetFlag, "authmiddleware.enableBearerAuth=false",
 			)
 			out, err = exec.Command("helm", args...).CombinedOutput()
 			Expect(err).To(HaveOccurred(), "helm template should have failed")

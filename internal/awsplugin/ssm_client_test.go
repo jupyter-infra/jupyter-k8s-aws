@@ -21,9 +21,12 @@ import (
 )
 
 const (
-	testInstanceID = "mi-1234567890abcdef0"
-	testSessionID  = "sess-1234567890abcdef0"
-	testPodUID     = "test-pod-uid-123"
+	testInstanceID    = "mi-1234567890abcdef0"
+	testSessionID     = "sess-1234567890abcdef0"
+	testPodUID        = "test-pod-uid-123"
+	testFindPodUID    = "test-pod-uid"
+	testDocumentName  = "test-document"
+	testCleanupPodUID = "pod-123"
 )
 
 // default max sessions for tests
@@ -108,7 +111,7 @@ func TestSSMClient_FindInstanceByPodUID(t *testing.T) {
 	}{
 		{
 			name:   "successful instance lookup",
-			podUID: "test-pod-uid",
+			podUID: testFindPodUID,
 			mockSetup: func(m *MockSSMClient) {
 				instanceID := testInstanceID
 				regDate := time.Now()
@@ -143,7 +146,7 @@ func TestSSMClient_FindInstanceByPodUID(t *testing.T) {
 		},
 		{
 			name:   "multiple instances - returns most recent",
-			podUID: "test-pod-uid",
+			podUID: testFindPodUID,
 			mockSetup: func(m *MockSSMClient) {
 				oldInstanceID := "mi-old-instance"
 				newInstanceID := "mi-new-instance"
@@ -170,7 +173,7 @@ func TestSSMClient_FindInstanceByPodUID(t *testing.T) {
 		},
 		{
 			name:   "multiple instances with nil registration date",
-			podUID: "test-pod-uid",
+			podUID: testFindPodUID,
 			mockSetup: func(m *MockSSMClient) {
 				instanceWithDate := "mi-with-date"
 				instanceNoDate := "mi-no-date"
@@ -228,7 +231,7 @@ func TestSSMClient_StartSession(t *testing.T) {
 		{
 			name:         "successful session start",
 			instanceID:   testInstanceID,
-			documentName: "test-document",
+			documentName: testDocumentName,
 			mockSetup: func(m *MockSSMClient) {
 				sessionID := testSessionID
 				tokenValue := "test-token"
@@ -244,7 +247,7 @@ func TestSSMClient_StartSession(t *testing.T) {
 					}, nil)
 				m.On("StartSession", mock.Anything, mock.MatchedBy(func(input *ssm.StartSessionInput) bool {
 					return *input.Target == testInstanceID &&
-						*input.DocumentName == "test-document" &&
+						*input.DocumentName == testDocumentName &&
 						input.Parameters != nil &&
 						len(input.Parameters["portNumber"]) == 1 &&
 						input.Parameters["portNumber"][0] == "2222"
@@ -292,7 +295,7 @@ func TestSSMClient_StartSession(t *testing.T) {
 		{
 			name:         "too many active sessions",
 			instanceID:   testInstanceID,
-			documentName: "test-document",
+			documentName: testDocumentName,
 			mockSetup: func(m *MockSSMClient) {
 				// Mock DescribeSessions to return max sessions
 				sessions := make([]types.Session, testMaxSessions)
@@ -363,7 +366,7 @@ func TestCreateActivation_Success(t *testing.T) {
 	tags := map[string]string{
 		"managed-by":        "jupyter-k8s-operator",
 		"workspace-name":    "test-workspace",
-		"workspace-pod-uid": "pod-123",
+		"workspace-pod-uid": testCleanupPodUID,
 	}
 
 	// Execute
@@ -428,7 +431,7 @@ func TestCleanupByPodUID_Success(t *testing.T) {
 	mockClient := &MockSSMClient{}
 	client := NewSSMClientWithMock(mockClient, "us-west-2")
 	ctx := context.Background()
-	podUID := "pod-123"
+	podUID := testCleanupPodUID
 
 	// Mock DescribeInstanceInformation response - single instance
 	describeOutput := &ssm.DescribeInstanceInformationOutput{
@@ -465,7 +468,7 @@ func TestCleanupByPodUID_NoInstances(t *testing.T) {
 	mockClient := &MockSSMClient{}
 	client := NewSSMClientWithMock(mockClient, "us-west-2")
 	ctx := context.Background()
-	podUID := "pod-123"
+	podUID := testCleanupPodUID
 
 	// Mock DescribeInstanceInformation response - no instances
 	describeOutput := &ssm.DescribeInstanceInformationOutput{
