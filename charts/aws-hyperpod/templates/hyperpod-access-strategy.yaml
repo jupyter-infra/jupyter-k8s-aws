@@ -74,8 +74,8 @@ spec:
             workspace.jupyter.org/workspace-name: "{{`{{ .Workspace.Name }}`}}"
           ports:
             - name: ssh
-              port: 22
-              targetPort: 22
+              port: {{ .Values.directSSH.port }}
+              targetPort: {{ .Values.directSSH.port }}
               protocol: TCP
     {{- end }}
   {{- else }}
@@ -203,3 +203,7 @@ spec:
             valueTemplate: "{{`{{ index .Workspace.Annotations \"workspace.jupyter.org/created-by\" }}`}}"
           - name: JUPYTER_BASE_URL
             valueTemplate: "/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/"
+          {{- if .Values.directSSH.enabled }}
+          - name: DIRECT_SSH_PORT
+            valueTemplate: "{{ .Values.directSSH.port }}"
+          {{- end }}

@@ -133,6 +133,9 @@ directSSH:
   # Workspace hostname format: {workspace-name}.{namespace}.{domain}
   domain: ""
 
+  # directSSH port (default 22). SG rule must match this port.
+  port: 22
+
   # Init container image carrying OpenSSH binaries (managed by service team)
   initImage:
     containerRegistry: ""
