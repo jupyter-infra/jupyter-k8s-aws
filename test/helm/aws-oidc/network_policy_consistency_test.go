@@ -35,20 +35,7 @@ var _ = Describe("Network Policy Consistency", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	requiredArgs := func() []string {
-		return []string{
-			"--set", "domain=test.example.com",
-			"--set", "certManager.email=admin@example.com",
-			"--set", "storageClass.efs.parameters.fileSystemId=fs-000",
-			"--set", "github.clientId=cid",
-			"--set", "github.clientSecret=csec",
-			"--set", "github.orgs[0].name=org",
-			"--set", "github.orgs[0].teams[0]=t",
-			"--set", "githubRbac.orgs[0].name=org",
-			"--set", "githubRbac.orgs[0].teams[0]=t",
-			"--set", "oauth2Proxy.cookieSecret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-		}
-	}
+	const webAppComponent = "web-app"
 
 	// The full set of behind-traefik components. Adding a fifth component that
 	// sits behind traefik should mean adding a row here — that is intentional
@@ -57,7 +44,7 @@ var _ = Describe("Network Policy Consistency", func() {
 		{"dex", "dex/network-policy.yaml", "dex", "oauth", 5556},
 		{"authmiddleware", "authmiddleware/network-policy.yaml", "authmiddleware", "auth", 8080},
 		{"oauth2-proxy", "oauth2-proxy/network-policy.yaml", "oauth2-proxy", "auth", 4180},
-		{"web-app", "web-app/network-policy.yaml", "web-app", "web-app", 8090},
+		{webAppComponent, webAppComponent + "/network-policy.yaml", webAppComponent, webAppComponent, 8090},
 	}
 
 	var policies map[string]networkingv1.NetworkPolicy
@@ -68,9 +55,9 @@ var _ = Describe("Network Policy Consistency", func() {
 		copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 
 		// Render with every behind-traefik component enabled.
-		args := append(requiredArgs(),
-			"--set", "webApp.enabled=true",
-			"--set", "authmiddleware.enabled=true",
+		args := append(oidcRequiredArgs(),
+			helmSetFlag, "webApp.enabled=true",
+			helmSetFlag, "authmiddleware.enabled=true",
 		)
 		helmTemplate(chartDir, outputDir, args...)
 		templatesDir := filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates")
