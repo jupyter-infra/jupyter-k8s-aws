@@ -1,0 +1,27 @@
+{{- if .Values.traefik.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: traefik
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: traefik
+    component: router
+spec:
+  scaleTargetRef:
+    name: traefik
+  minReplicaCount: {{ .Values.traefik.keda.minReplicas }}
+  maxReplicaCount: {{ .Values.traefik.keda.maxReplicas }}
+  cooldownPeriod: 300
+  pollingInterval: 30
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.traefik.keda.prometheusAddress }}
+        # Average open connections per Traefik pod. Each active workspace holds a
+        # persistent WebSocket — this is the right signal for Traefik scaling.
+        query: |
+          sum(traefik_open_connections{entrypoint="websecure"}) /
+          count(traefik_open_connections{entrypoint="websecure"})
+        threshold: {{ .Values.traefik.keda.targetOpenConnections | quote }}
+{{- end }}

@@ -1,9 +1,17 @@
 # [AWS OIDC]: Configuration for aws-oidc deployment mode
 
-# Node selector labels applied to all chart component pods (default: no constraint)
-nodeSelector: {}
-# Tolerations applied to all chart component pods (default: none)
-tolerations: []
+# Node selector labels applied to all chart component pods.
+# Defaults to the routing Karpenter NodePool; override per-component if needed.
+nodeSelector:
+  jupyter-deploy/role: routing
+
+# Tolerations applied to all chart component pods.
+# Must tolerate the routing NodePool taint so pods schedule onto Karpenter routing nodes.
+tolerations:
+  - key: jupyter-deploy/role
+    operator: Equal
+    value: routing
+    effect: NoSchedule
 
 # Init container image used for readiness checks
 initImage:
@@ -65,8 +73,17 @@ traefik:
   imageName: traefik
   # Traefik deployment image tag
   imageTag: v3.7.7
-  # Number of traefik replicas
-  replicas: 1
+  # Number of traefik replicas (used when keda.enabled is false)
+  replicas: 2
+  # KEDA ScaledObject configuration — scales Traefik based on open connections.
+  # Requires Prometheus at prometheus.monitoring.svc.cluster.local:9090.
+  keda:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    # Scale up when average open connections per replica exceeds this threshold.
+    targetOpenConnections: "100"
+    prometheusAddress: "http://prometheus-server.monitoring.svc.cluster.local:80"
   # Redirect HTTP to HTTPS
   redirectHttp: true
   # Whether to configure traefik at 'debug' log level ('info' if omitted)
@@ -80,7 +97,7 @@ traefik:
 
 # Dex configuration
 dex:
-  # Number of dex replicas
+  # Number of dex replicas (static — auth only, negligible load)
   replicas: 1
   # Dex image settings
   repository: ghcr.io/dexidp/dex
@@ -184,6 +201,9 @@ oauth2Proxy:
   nodeSelector: {}
   # Tolerations for oauth2-proxy pods (overrides chart-level tolerations)
   tolerations: []
+  # oauth2-proxy is a control-plane singleton (handles login flows only, not per-request auth).
+  # Horizontal scaling requires shared session state — kept as a fixed replica count for now.
+  replicas: 1
   # Cookie secret for OAuth2 Proxy (generate with openssl rand -base64 32 | tr -- '+/' '-_')
   cookieSecret: ""
   # Cookie expiry duration (Go duration string, e.g. "8h", "1h30m")
@@ -222,7 +242,20 @@ webApp:
   tolerations: []
   # Enable or disable the web UI (default: true)
   enabled: true
+  # replicas is used only when keda.enabled is false
   replicas: 2
+  # KEDA ScaledObject configuration — scales web-app based on Traefik open
+  # connections. web-app has no /metrics endpoint, so Traefik's connection count
+  # is used as a proxy for active user sessions.
+  keda:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 20
+    # Scale up when average open connections per replica exceeds this threshold.
+    # Higher than traefik/authmiddleware — web-app is stateless and lightweight,
+    # handling more concurrent sessions per pod.
+    targetOpenConnections: "200"
+    prometheusAddress: "http://prometheus-server.monitoring.svc.cluster.local:80"
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-ui
@@ -269,8 +302,20 @@ authmiddleware:
   tolerations: []
   # Whether to deploy the authmiddleware component
   enabled: true
-  # Number of replicas
-  replicas: 1
+  # Number of replicas (used when keda.enabled is false)
+  replicas: 2
+  # KEDA ScaledObject configuration — scales authmiddleware based on Traefik open
+  # connections. authmiddleware is a ForwardAuth called on every workspace request
+  # with no session cookie bypass, so it scales with active workspace sessions.
+  keda:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    # Scale up when average open connections per replica exceeds this threshold.
+    # Lower than traefik because authmiddleware is called per-request (synchronous
+    # on the hot path), making it more sensitive to load than connection count alone.
+    targetOpenConnections: "50"
+    prometheusAddress: "http://prometheus-server.monitoring.svc.cluster.local:80"
   # Authmiddleware image settings
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra

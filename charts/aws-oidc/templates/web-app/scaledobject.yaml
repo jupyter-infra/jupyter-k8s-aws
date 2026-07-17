@@ -1,0 +1,39 @@
+{{- if .Values.webApp.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: web-app
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: web-app
+    component: router
+spec:
+  scaleTargetRef:
+    name: web-app
+  minReplicaCount: {{ .Values.webApp.keda.minReplicas }}
+  maxReplicaCount: {{ .Values.webApp.keda.maxReplicas }}
+  # Scale down conservatively — UI availability matters more than tight bin-packing.
+  cooldownPeriod: 300
+  pollingInterval: 30
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.webApp.keda.prometheusAddress }}
+        # Average open connections per web-app pod, sourced from Traefik.
+        #
+        # Why open connections, not request rate:
+        # web-app does not expose a /metrics endpoint (Bun server). Using Traefik's
+        # open connections as a proxy is correct because every active user session
+        # has a persistent connection through Traefik's websecure entrypoint, and
+        # web-app serves all UI and API traffic for those sessions. Connection count
+        # scales linearly with active users.
+        #
+        # web-app has a higher threshold than traefik/authmiddleware because it is
+        # a lightweight stateless server — each connection generates less per-pod
+        # work than Traefik (which holds WebSocket tunnels) or authmiddleware (which
+        # is called synchronously on every workspace request).
+        query: |
+          sum(traefik_open_connections{entrypoint="websecure"}) /
+          count(traefik_open_connections{entrypoint="websecure"})
+        threshold: {{ .Values.webApp.keda.targetOpenConnections | quote }}
+{{- end }}

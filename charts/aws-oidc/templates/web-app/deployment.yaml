@@ -8,7 +8,9 @@ metadata:
     app: web-app
     component: web-app
 spec:
+  {{- if not .Values.webApp.keda.enabled }}
   replicas: {{ .Values.webApp.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       app: web-app

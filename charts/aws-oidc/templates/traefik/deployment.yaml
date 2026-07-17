@@ -7,7 +7,9 @@ metadata:
     app: traefik
     component: router
 spec:
+  {{- if not .Values.traefik.keda.enabled }}
   replicas: {{ .Values.traefik.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       app: traefik
@@ -58,10 +60,10 @@ spec:
         resources:
           requests:
             cpu: 100m
-            memory: 64Mi
+            memory: 128Mi
           limits:
             cpu: 500m
-            memory: 256Mi
+            memory: 512Mi
         readinessProbe:
           httpGet:
             path: /ping

@@ -8,7 +8,9 @@ metadata:
     app: authmiddleware
     component: auth
 spec:
+  {{- if not .Values.authmiddleware.keda.enabled }}
   replicas: {{ .Values.authmiddleware.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       app: authmiddleware

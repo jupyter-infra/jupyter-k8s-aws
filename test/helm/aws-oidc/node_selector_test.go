@@ -27,9 +27,16 @@ var _ = Describe("Node Selector and Tolerations", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should not include nodeSelector or tolerations with default values", func() {
+	It("should include routing nodeSelector and taint toleration with default values", func() {
 		testOutputDir := filepath.Join(
 			rootDir, "dist/test-output/aws-oidc/jupyter-k8s-aws-oidc/templates")
+
+		routingToleration := corev1.Toleration{
+			Key:      "jupyter-deploy/role",
+			Operator: corev1.TolerationOpEqual,
+			Value:    "routing",
+			Effect:   corev1.TaintEffectNoSchedule,
+		}
 
 		deployments := []string{
 			"traefik/deployment.yaml",
@@ -44,10 +51,11 @@ var _ = Describe("Node Selector and Tolerations", func() {
 
 			var dep appsv1.Deployment
 			Expect(yaml.Unmarshal(data, &dep)).To(Succeed(), "Failed to unmarshal %s", d)
-			Expect(dep.Spec.Template.Spec.NodeSelector).To(BeEmpty(),
-				"Expected no nodeSelector in %s with default values", d)
-			Expect(dep.Spec.Template.Spec.Tolerations).To(BeEmpty(),
-				"Expected no tolerations in %s with default values", d)
+			Expect(dep.Spec.Template.Spec.NodeSelector).To(
+				HaveKeyWithValue("jupyter-deploy/role", "routing"),
+				"Expected routing nodeSelector in %s with default values", d)
+			Expect(dep.Spec.Template.Spec.Tolerations).To(ContainElement(routingToleration),
+				"Expected routing taint toleration in %s with default values", d)
 		}
 
 		cronJobPath := filepath.Join(testOutputDir, "rotator/cronjob.yaml")
@@ -56,10 +64,11 @@ var _ = Describe("Node Selector and Tolerations", func() {
 
 		var cj batchv1.CronJob
 		Expect(yaml.Unmarshal(data, &cj)).To(Succeed())
-		Expect(cj.Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(BeEmpty(),
-			"Expected no nodeSelector in cronjob with default values")
-		Expect(cj.Spec.JobTemplate.Spec.Template.Spec.Tolerations).To(BeEmpty(),
-			"Expected no tolerations in cronjob with default values")
+		Expect(cj.Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(
+			HaveKeyWithValue("jupyter-deploy/role", "routing"),
+			"Expected routing nodeSelector in cronjob with default values")
+		Expect(cj.Spec.JobTemplate.Spec.Template.Spec.Tolerations).To(ContainElement(routingToleration),
+			"Expected routing taint toleration in cronjob with default values")
 	})
 
 	Context("with chart-level nodeSelector and tolerations", func() {
