@@ -32,7 +32,7 @@ var _ = Describe("Node Selector and Tolerations", func() {
 			rootDir, "dist/test-output/aws-oidc/jupyter-k8s-aws-oidc/templates")
 
 		routingToleration := corev1.Toleration{
-			Key:      "jupyter-deploy/role",
+			Key:      roleLabelKey,
 			Operator: corev1.TolerationOpEqual,
 			Value:    "routing",
 			Effect:   corev1.TaintEffectNoSchedule,
@@ -52,7 +52,7 @@ var _ = Describe("Node Selector and Tolerations", func() {
 			var dep appsv1.Deployment
 			Expect(yaml.Unmarshal(data, &dep)).To(Succeed(), "Failed to unmarshal %s", d)
 			Expect(dep.Spec.Template.Spec.NodeSelector).To(
-				HaveKeyWithValue("jupyter-deploy/role", "routing"),
+				HaveKeyWithValue(roleLabelKey, "routing"),
 				"Expected routing nodeSelector in %s with default values", d)
 			Expect(dep.Spec.Template.Spec.Tolerations).To(ContainElement(routingToleration),
 				"Expected routing taint toleration in %s with default values", d)
@@ -65,7 +65,7 @@ var _ = Describe("Node Selector and Tolerations", func() {
 		var cj batchv1.CronJob
 		Expect(yaml.Unmarshal(data, &cj)).To(Succeed())
 		Expect(cj.Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(
-			HaveKeyWithValue("jupyter-deploy/role", "routing"),
+			HaveKeyWithValue(roleLabelKey, "routing"),
 			"Expected routing nodeSelector in cronjob with default values")
 		Expect(cj.Spec.JobTemplate.Spec.Template.Spec.Tolerations).To(ContainElement(routingToleration),
 			"Expected routing taint toleration in cronjob with default values")
@@ -116,11 +116,11 @@ var _ = Describe("Node Selector and Tolerations", func() {
 				var dep appsv1.Deployment
 				Expect(yaml.Unmarshal(data, &dep)).To(Succeed(), "Failed to unmarshal %s", d)
 				Expect(dep.Spec.Template.Spec.NodeSelector).To(
-					HaveKeyWithValue("jupyter-deploy/role", "components"),
+					HaveKeyWithValue(roleLabelKey, "components"),
 					"Expected nodeSelector in %s", d)
 				Expect(dep.Spec.Template.Spec.Tolerations).To(ContainElement(
 					corev1.Toleration{
-						Key:      "jupyter-deploy/role",
+						Key:      roleLabelKey,
 						Operator: corev1.TolerationOpEqual,
 						Value:    "components",
 						Effect:   corev1.TaintEffectNoSchedule,
@@ -141,11 +141,11 @@ var _ = Describe("Node Selector and Tolerations", func() {
 				var cj batchv1.CronJob
 				Expect(yaml.Unmarshal(data, &cj)).To(Succeed(), "Failed to unmarshal %s", c)
 				Expect(cj.Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(
-					HaveKeyWithValue("jupyter-deploy/role", "components"),
+					HaveKeyWithValue(roleLabelKey, "components"),
 					"Expected nodeSelector in %s", c)
 				Expect(cj.Spec.JobTemplate.Spec.Template.Spec.Tolerations).To(ContainElement(
 					corev1.Toleration{
-						Key:      "jupyter-deploy/role",
+						Key:      roleLabelKey,
 						Operator: corev1.TolerationOpEqual,
 						Value:    "components",
 						Effect:   corev1.TaintEffectNoSchedule,
@@ -185,14 +185,14 @@ var _ = Describe("Node Selector and Tolerations", func() {
 			var traefik appsv1.Deployment
 			Expect(yaml.Unmarshal(data, &traefik)).To(Succeed())
 			Expect(traefik.Spec.Template.Spec.NodeSelector).To(
-				HaveKeyWithValue("jupyter-deploy/role", "edge"))
+				HaveKeyWithValue(roleLabelKey, "edge"))
 
 			data, err = os.ReadFile(filepath.Join(templatesDir, "dex/deployment.yaml"))
 			Expect(err).NotTo(HaveOccurred())
 			var dex appsv1.Deployment
 			Expect(yaml.Unmarshal(data, &dex)).To(Succeed())
 			Expect(dex.Spec.Template.Spec.NodeSelector).To(
-				HaveKeyWithValue("jupyter-deploy/role", "components"))
+				HaveKeyWithValue(roleLabelKey, "components"))
 		})
 	})
 })

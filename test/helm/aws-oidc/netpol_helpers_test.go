@@ -22,6 +22,10 @@ const (
 
 	oauthStrategyFile  = "access-strategy/oauth-access-strategy.yaml"
 	bearerStrategyFile = "access-strategy/bearer-access-strategy.yaml"
+
+	// roleLabelKey is the node label / taint key jupyter-deploy uses to pin
+	// chart pods to a specific Karpenter NodePool.
+	roleLabelKey = "jupyter-deploy/role"
 )
 
 // oidcRequiredArgs returns the standard helm values needed to render the
