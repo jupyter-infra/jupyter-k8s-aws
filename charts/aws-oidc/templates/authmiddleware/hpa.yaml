@@ -1,4 +1,8 @@
-{{- if .Values.authmiddleware.keda.enabled }}
+{{- /* Render only when KEDA is enabled AND its CRD is installed. The CRD check
+       degrades a missing KEDA install to "no autoscaler" instead of a hard
+       `no matches for kind "ScaledObject"` helm failure. jupyter-deploy installs
+       KEDA before this chart; standalone installs without KEDA simply skip this. */ -}}
+{{- if and .Values.authmiddleware.keda.enabled (.Capabilities.APIVersions.Has "keda.sh/v1alpha1") }}
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -18,7 +22,8 @@ spec:
     - type: prometheus
       metadata:
         serverAddress: {{ .Values.authmiddleware.keda.prometheusAddress }}
-        # Average open connections per authmiddleware pod, sourced from Traefik.
+        # Total open connections on Traefik's websecure entrypoint, used as a
+        # proxy for authmiddleware load.
         #
         # Why open connections, not request rate:
         # authmiddleware is a Traefik ForwardAuth — it is called on EVERY request
@@ -32,8 +37,13 @@ spec:
         # Why Traefik's metric instead of authmiddleware's own /metrics:
         # authmiddleware exposes controller-runtime internals on :9090, not HTTP
         # request counters. Traefik is the single source of truth for traffic volume.
-        query: |
-          sum(traefik_open_connections{entrypoint="websecure"}) /
-          count(traefik_open_connections{entrypoint="websecure"})
+        #
+        # This is the RAW total. metricType defaults to AverageValue, so KEDA/HPA
+        # divides it by the authmiddleware replica count before comparing to
+        # threshold — desiredReplicas = ceil(total / threshold). Do NOT add
+        # "/ count(...)": the numerator counts Traefik series, so dividing here
+        # would scale authmiddleware on Traefik's pod count instead of its own.
+        query: sum(traefik_open_connections{entrypoint="websecure"})
+        # Target open connections per authmiddleware pod.
         threshold: {{ .Values.authmiddleware.keda.targetOpenConnections | quote }}
 {{- end }}

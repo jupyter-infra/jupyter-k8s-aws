@@ -1,4 +1,8 @@
-{{- if .Values.webApp.keda.enabled }}
+{{- /* Render only when KEDA is enabled AND its CRD is installed. The CRD check
+       degrades a missing KEDA install to "no autoscaler" instead of a hard
+       `no matches for kind "ScaledObject"` helm failure. jupyter-deploy installs
+       KEDA before this chart; standalone installs without KEDA simply skip this. */ -}}
+{{- if and .Values.webApp.keda.enabled (.Capabilities.APIVersions.Has "keda.sh/v1alpha1") }}
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -19,7 +23,8 @@ spec:
     - type: prometheus
       metadata:
         serverAddress: {{ .Values.webApp.keda.prometheusAddress }}
-        # Average open connections per web-app pod, sourced from Traefik.
+        # Total open connections on Traefik's websecure entrypoint, used as a
+        # proxy for active user sessions.
         #
         # Why open connections, not request rate:
         # web-app does not expose a /metrics endpoint (Bun server). Using Traefik's
@@ -32,8 +37,13 @@ spec:
         # a lightweight stateless server — each connection generates less per-pod
         # work than Traefik (which holds WebSocket tunnels) or authmiddleware (which
         # is called synchronously on every workspace request).
-        query: |
-          sum(traefik_open_connections{entrypoint="websecure"}) /
-          count(traefik_open_connections{entrypoint="websecure"})
+        #
+        # This is the RAW total. metricType defaults to AverageValue, so KEDA/HPA
+        # divides it by the web-app replica count before comparing to threshold —
+        # desiredReplicas = ceil(total / threshold). Do NOT add "/ count(...)": the
+        # numerator counts Traefik series, so dividing here would scale web-app on
+        # Traefik's pod count instead of its own.
+        query: sum(traefik_open_connections{entrypoint="websecure"})
+        # Target open connections per web-app pod.
         threshold: {{ .Values.webApp.keda.targetOpenConnections | quote }}
 {{- end }}

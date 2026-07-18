@@ -149,6 +149,7 @@ helm-test-aws-oidc: ## Render and test aws-oidc chart
 	cp -r $(CHART_OIDC) /tmp/helm-test-chart
 	cd /tmp/helm-test-chart && helm dependency build
 	helm template jk8s /tmp/helm-test-chart --output-dir dist/test-output/aws-oidc \
+		--api-versions keda.sh/v1alpha1 \
 		--set domain=a.fine.example.com \
 		--set certManager.email=admin@example.com \
 		--set storageClass.efs.parameters.fileSystemId=fs-00001111222233334 \

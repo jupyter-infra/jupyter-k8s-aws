@@ -1,12 +1,26 @@
 # [AWS OIDC]: Configuration for aws-oidc deployment mode
+#
+# DEPLOYMENT CONTRACT — this chart targets jupyter-deploy-managed clusters.
+# The defaults below assume infrastructure that jupyter-deploy provisions:
+#   - the KEDA operator + its keda.sh/v1alpha1 CRDs   (*.keda.enabled below)
+#   - a Prometheus server in the monitoring namespace (*.keda.prometheusAddress)
+#   - a "routing" Karpenter NodePool: nodes labeled jupyter-deploy/role=routing
+#     and carrying a matching NoSchedule taint       (nodeSelector + tolerations)
+# STANDALONE / NON-jupyter-deploy INSTALLS must override these: set every
+# *.keda.enabled=false and clear/replace nodeSelector and tolerations, or pods
+# will fail to render (missing KEDA CRD) or stay Pending (no routing nodes).
 
 # Node selector labels applied to all chart component pods.
-# Defaults to the routing Karpenter NodePool; override per-component if needed.
+# Targets the jupyter-deploy routing Karpenter NodePool; override per-component
+# if needed. jupyter-deploy also sets this explicitly via --set.
 nodeSelector:
   jupyter-deploy/role: routing
 
 # Tolerations applied to all chart component pods.
-# Must tolerate the routing NodePool taint so pods schedule onto Karpenter routing nodes.
+# REQUIRED on the jupyter-deploy path: the routing NodePool carries a NoSchedule
+# taint, so without this toleration the nodeSelector above strands every pod
+# Pending. jupyter-deploy sets the nodeSelector but relies on this default for
+# the toleration — do not drop it without also adding it to jupyter-deploy.
 tolerations:
   - key: jupyter-deploy/role
     operator: Equal

@@ -1,4 +1,8 @@
-{{- if .Values.traefik.keda.enabled }}
+{{- /* Render only when KEDA is enabled AND its CRD is installed. The CRD check
+       degrades a missing KEDA install to "no autoscaler" instead of a hard
+       `no matches for kind "ScaledObject"` helm failure. jupyter-deploy installs
+       KEDA before this chart; standalone installs without KEDA simply skip this. */ -}}
+{{- if and .Values.traefik.keda.enabled (.Capabilities.APIVersions.Has "keda.sh/v1alpha1") }}
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -18,10 +22,17 @@ spec:
     - type: prometheus
       metadata:
         serverAddress: {{ .Values.traefik.keda.prometheusAddress }}
-        # Average open connections per Traefik pod. Each active workspace holds a
-        # persistent WebSocket — this is the right signal for Traefik scaling.
-        query: |
-          sum(traefik_open_connections{entrypoint="websecure"}) /
-          count(traefik_open_connections{entrypoint="websecure"})
+        # Total open connections across the websecure entrypoint. Each active
+        # workspace holds a persistent WebSocket, so this is the right signal for
+        # Traefik scaling.
+        #
+        # This is the RAW total, not a per-pod average. metricType defaults to
+        # AverageValue, so KEDA/HPA divides this by the Traefik replica count
+        # before comparing to threshold — desiredReplicas = ceil(total / threshold).
+        # Do NOT add "/ count(...)" here: that would divide by pod count a second
+        # time, so the loop would converge at sqrt(total/threshold) and under-scale
+        # under exactly the load this exists to handle.
+        query: sum(traefik_open_connections{entrypoint="websecure"})
+        # Target open connections per Traefik pod.
         threshold: {{ .Values.traefik.keda.targetOpenConnections | quote }}
 {{- end }}
