@@ -1,7 +1,7 @@
 {{- /* Render only when KEDA is enabled AND its CRD is installed. The CRD check
        degrades a missing KEDA install to "no autoscaler" instead of a hard
-       `no matches for kind "ScaledObject"` helm failure. jupyter-deploy installs
-       KEDA before this chart; standalone installs without KEDA simply skip this. */ -}}
+       `no matches for kind "ScaledObject"` helm failure. Clusters without the
+       KEDA operator simply skip this resource. */ -}}
 {{- if and .Values.webApp.keda.enabled (.Capabilities.APIVersions.Has "keda.sh/v1alpha1") }}
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -16,9 +16,8 @@ spec:
     name: web-app
   minReplicaCount: {{ .Values.webApp.keda.minReplicas }}
   maxReplicaCount: {{ .Values.webApp.keda.maxReplicas }}
-  # Scale down conservatively — UI availability matters more than tight bin-packing.
-  cooldownPeriod: 300
-  pollingInterval: 30
+  cooldownPeriod: {{ .Values.webApp.keda.cooldownPeriod }}
+  pollingInterval: {{ .Values.webApp.keda.pollingInterval }}
   triggers:
     - type: prometheus
       metadata:
@@ -37,6 +36,10 @@ spec:
         # a lightweight stateless server — each connection generates less per-pod
         # work than Traefik (which holds WebSocket tunnels) or authmiddleware (which
         # is called synchronously on every workspace request).
+        #
+        # Caveat: scales on connection count only, not CPU/memory. Fine as long as
+        # web-app resources are sized for the per-connection work; revisit if a
+        # load test shows resource pressure before the connection threshold trips.
         #
         # This is the RAW total. metricType defaults to AverageValue, so KEDA/HPA
         # divides it by the web-app replica count before comparing to threshold —

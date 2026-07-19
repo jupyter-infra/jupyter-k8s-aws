@@ -1,7 +1,7 @@
 {{- /* Render only when KEDA is enabled AND its CRD is installed. The CRD check
        degrades a missing KEDA install to "no autoscaler" instead of a hard
-       `no matches for kind "ScaledObject"` helm failure. jupyter-deploy installs
-       KEDA before this chart; standalone installs without KEDA simply skip this. */ -}}
+       `no matches for kind "ScaledObject"` helm failure. Clusters without the
+       KEDA operator simply skip this resource. */ -}}
 {{- if and .Values.authmiddleware.keda.enabled (.Capabilities.APIVersions.Has "keda.sh/v1alpha1") }}
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -16,8 +16,8 @@ spec:
     name: authmiddleware
   minReplicaCount: {{ .Values.authmiddleware.keda.minReplicas }}
   maxReplicaCount: {{ .Values.authmiddleware.keda.maxReplicas }}
-  cooldownPeriod: 300
-  pollingInterval: 30
+  cooldownPeriod: {{ .Values.authmiddleware.keda.cooldownPeriod }}
+  pollingInterval: {{ .Values.authmiddleware.keda.pollingInterval }}
   triggers:
     - type: prometheus
       metadata:
@@ -37,6 +37,16 @@ spec:
         # Why Traefik's metric instead of authmiddleware's own /metrics:
         # authmiddleware exposes controller-runtime internals on :9090, not HTTP
         # request counters. Traefik is the single source of truth for traffic volume.
+        #
+        # Caveats:
+        # - web-app (UI/API) traffic does NOT pass through authmiddleware — only
+        #   workspace IngressRoutes are ForwardAuth-gated. Total websecure
+        #   connections therefore overcounts authmiddleware's real load, which is
+        #   conservative (scales a little early) and acceptable.
+        # - this scales on connection count only, not CPU/memory. That is fine as
+        #   long as authmiddleware resources are sized for the per-connection work;
+        #   revisit if a load test shows memory pressure before the connection
+        #   threshold trips.
         #
         # This is the RAW total. metricType defaults to AverageValue, so KEDA/HPA
         # divides it by the authmiddleware replica count before comparing to

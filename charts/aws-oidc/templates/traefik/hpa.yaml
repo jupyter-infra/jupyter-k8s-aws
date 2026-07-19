@@ -1,7 +1,7 @@
 {{- /* Render only when KEDA is enabled AND its CRD is installed. The CRD check
        degrades a missing KEDA install to "no autoscaler" instead of a hard
-       `no matches for kind "ScaledObject"` helm failure. jupyter-deploy installs
-       KEDA before this chart; standalone installs without KEDA simply skip this. */ -}}
+       `no matches for kind "ScaledObject"` helm failure. Clusters without the
+       KEDA operator simply skip this resource. */ -}}
 {{- if and .Values.traefik.keda.enabled (.Capabilities.APIVersions.Has "keda.sh/v1alpha1") }}
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -16,8 +16,8 @@ spec:
     name: traefik
   minReplicaCount: {{ .Values.traefik.keda.minReplicas }}
   maxReplicaCount: {{ .Values.traefik.keda.maxReplicas }}
-  cooldownPeriod: 300
-  pollingInterval: 30
+  cooldownPeriod: {{ .Values.traefik.keda.cooldownPeriod }}
+  pollingInterval: {{ .Values.traefik.keda.pollingInterval }}
   triggers:
     - type: prometheus
       metadata:
@@ -25,6 +25,16 @@ spec:
         # Total open connections across the websecure entrypoint. Each active
         # workspace holds a persistent WebSocket, so this is the right signal for
         # Traefik scaling.
+        #
+        # Caveats:
+        # - assumes this Traefik only fronts jupyter-k8s traffic. If it ever serves
+        #   unrelated traffic on websecure, that inflates the count and this signal
+        #   would need an entrypoint/router filter.
+        # - scales on connection count, not throughput. Large file transfers,
+        #   media-rich content, or high-volume log streaming can saturate node
+        #   network bandwidth well below the connection threshold. If that shows up
+        #   in load tests, add a bandwidth-based trigger and spread Traefik pods
+        #   across nodes (pod anti-affinity already prefers this).
         #
         # This is the RAW total, not a per-pod average. metricType defaults to
         # AverageValue, so KEDA/HPA divides this by the Traefik replica count

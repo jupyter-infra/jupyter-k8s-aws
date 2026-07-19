@@ -38,53 +38,53 @@ var _ = Describe("Replica management", func() {
 	}
 
 	Context("traefik", func() {
-		It("should omit replicas when keda.enabled=true (default)", func() {
+		It("should set replicas when keda.enabled=false (default)", func() {
 			dep := renderDeployment("traefik")
-			Expect(dep.Spec.Replicas).To(BeNil(),
-				"traefik Deployment must not set replicas when keda.enabled=true so KEDA owns the count")
+			Expect(dep.Spec.Replicas).NotTo(BeNil(),
+				"traefik Deployment should set replicas when keda is disabled (default)")
+			Expect(*dep.Spec.Replicas).To(BeEquivalentTo(2))
 		})
 
-		It("should set replicas when keda.enabled=false", func() {
-			dep := renderDeployment("traefik", helmSetFlag, "traefik.keda.enabled=false")
-			Expect(dep.Spec.Replicas).NotTo(BeNil(),
-				"traefik Deployment should set replicas when keda is disabled")
-			Expect(*dep.Spec.Replicas).To(BeEquivalentTo(2))
+		It("should omit replicas when keda.enabled=true", func() {
+			dep := renderDeployment("traefik", helmSetFlag, "traefik.keda.enabled=true")
+			Expect(dep.Spec.Replicas).To(BeNil(),
+				"traefik Deployment must not set replicas when keda.enabled=true so KEDA owns the count")
 		})
 	})
 
 	Context("authmiddleware", func() {
-		It("should omit replicas when keda.enabled=true (default)", func() {
+		It("should set replicas when keda.enabled=false (default)", func() {
 			dep := renderDeployment("authmiddleware",
 				helmSetFlag, "authmiddleware.enabled=true")
-			Expect(dep.Spec.Replicas).To(BeNil(),
-				"authmiddleware Deployment must not set replicas when keda.enabled=true so KEDA owns the count")
+			Expect(dep.Spec.Replicas).NotTo(BeNil(),
+				"authmiddleware Deployment should set replicas when keda is disabled (default)")
+			Expect(*dep.Spec.Replicas).To(BeEquivalentTo(2))
 		})
 
-		It("should set replicas when keda.enabled=false", func() {
+		It("should omit replicas when keda.enabled=true", func() {
 			dep := renderDeployment("authmiddleware",
 				helmSetFlag, "authmiddleware.enabled=true",
-				helmSetFlag, "authmiddleware.keda.enabled=false")
-			Expect(dep.Spec.Replicas).NotTo(BeNil(),
-				"authmiddleware Deployment should set replicas when keda is disabled")
-			Expect(*dep.Spec.Replicas).To(BeEquivalentTo(2))
+				helmSetFlag, "authmiddleware.keda.enabled=true")
+			Expect(dep.Spec.Replicas).To(BeNil(),
+				"authmiddleware Deployment must not set replicas when keda.enabled=true so KEDA owns the count")
 		})
 	})
 
 	Context("web-app", func() {
-		It("should omit replicas when keda.enabled=true (default)", func() {
+		It("should set replicas when keda.enabled=false (default)", func() {
 			dep := renderDeployment("web-app",
 				helmSetFlag, "webApp.enabled=true")
-			Expect(dep.Spec.Replicas).To(BeNil(),
-				"web-app Deployment must not set replicas when keda.enabled=true so KEDA owns the count")
+			Expect(dep.Spec.Replicas).NotTo(BeNil(),
+				"web-app Deployment should set replicas when keda is disabled (default)")
+			Expect(*dep.Spec.Replicas).To(BeEquivalentTo(2))
 		})
 
-		It("should set replicas when keda.enabled=false", func() {
+		It("should omit replicas when keda.enabled=true", func() {
 			dep := renderDeployment("web-app",
 				helmSetFlag, "webApp.enabled=true",
-				helmSetFlag, "webApp.keda.enabled=false")
-			Expect(dep.Spec.Replicas).NotTo(BeNil(),
-				"web-app Deployment should set replicas when keda is disabled")
-			Expect(*dep.Spec.Replicas).To(BeEquivalentTo(2))
+				helmSetFlag, "webApp.keda.enabled=true")
+			Expect(dep.Spec.Replicas).To(BeNil(),
+				"web-app Deployment must not set replicas when keda.enabled=true so KEDA owns the count")
 		})
 	})
 })

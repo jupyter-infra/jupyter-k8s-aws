@@ -1,31 +1,12 @@
 # [AWS OIDC]: Configuration for aws-oidc deployment mode
-#
-# DEPLOYMENT CONTRACT — this chart targets jupyter-deploy-managed clusters.
-# The defaults below assume infrastructure that jupyter-deploy provisions:
-#   - the KEDA operator + its keda.sh/v1alpha1 CRDs   (*.keda.enabled below)
-#   - a Prometheus server in the monitoring namespace (*.keda.prometheusAddress)
-#   - a "routing" Karpenter NodePool: nodes labeled jupyter-deploy/role=routing
-#     and carrying a matching NoSchedule taint       (nodeSelector + tolerations)
-# STANDALONE / NON-jupyter-deploy INSTALLS must override these: set every
-# *.keda.enabled=false and clear/replace nodeSelector and tolerations, or pods
-# will fail to render (missing KEDA CRD) or stay Pending (no routing nodes).
 
-# Node selector labels applied to all chart component pods.
-# Targets the jupyter-deploy routing Karpenter NodePool; override per-component
-# if needed. jupyter-deploy also sets this explicitly via --set.
-nodeSelector:
-  jupyter-deploy/role: routing
+# Node selector labels applied to all chart component pods (default: no constraint).
+# Set per deployment to pin pods to specific nodes; overridable per-component below.
+nodeSelector: {}
 
-# Tolerations applied to all chart component pods.
-# REQUIRED on the jupyter-deploy path: the routing NodePool carries a NoSchedule
-# taint, so without this toleration the nodeSelector above strands every pod
-# Pending. jupyter-deploy sets the nodeSelector but relies on this default for
-# the toleration — do not drop it without also adding it to jupyter-deploy.
-tolerations:
-  - key: jupyter-deploy/role
-    operator: Equal
-    value: routing
-    effect: NoSchedule
+# Tolerations applied to all chart component pods (default: none).
+# Set per deployment when target nodes carry taints; overridable per-component below.
+tolerations: []
 
 # Init container image used for readiness checks
 initImage:
@@ -90,11 +71,16 @@ traefik:
   # Number of traefik replicas (used when keda.enabled is false)
   replicas: 2
   # KEDA ScaledObject configuration — scales Traefik based on open connections.
-  # Requires Prometheus at prometheus.monitoring.svc.cluster.local:9090.
+  # Opt-in: enable only on clusters that have the KEDA operator + CRDs and a
+  # Prometheus reachable at prometheusAddress below.
   keda:
-    enabled: true
+    enabled: false
     minReplicas: 2
     maxReplicas: 10
+    # How long to wait after the last scale-up before scaling down (seconds).
+    cooldownPeriod: 300
+    # How often KEDA queries Prometheus for the metric (seconds).
+    pollingInterval: 30
     # Scale up when average open connections per replica exceeds this threshold.
     targetOpenConnections: "100"
     prometheusAddress: "http://prometheus-server.monitoring.svc.cluster.local:80"
@@ -261,10 +247,16 @@ webApp:
   # KEDA ScaledObject configuration — scales web-app based on Traefik open
   # connections. web-app has no /metrics endpoint, so Traefik's connection count
   # is used as a proxy for active user sessions.
+  # Opt-in: see traefik.keda notes on cluster prerequisites.
   keda:
-    enabled: true
+    enabled: false
     minReplicas: 2
     maxReplicas: 20
+    # How long to wait after the last scale-up before scaling down (seconds).
+    # Conservative — UI availability matters more than tight bin-packing.
+    cooldownPeriod: 300
+    # How often KEDA queries Prometheus for the metric (seconds).
+    pollingInterval: 30
     # Scale up when average open connections per replica exceeds this threshold.
     # Higher than traefik/authmiddleware — web-app is stateless and lightweight,
     # handling more concurrent sessions per pod.
@@ -321,14 +313,22 @@ authmiddleware:
   # KEDA ScaledObject configuration — scales authmiddleware based on Traefik open
   # connections. authmiddleware is a ForwardAuth called on every workspace request
   # with no session cookie bypass, so it scales with active workspace sessions.
+  # Opt-in: see traefik.keda notes on cluster prerequisites.
   keda:
-    enabled: true
+    enabled: false
     minReplicas: 2
     maxReplicas: 5
+    # How long to wait after the last scale-up before scaling down (seconds).
+    cooldownPeriod: 300
+    # How often KEDA queries Prometheus for the metric (seconds).
+    pollingInterval: 30
     # Scale up when average open connections per replica exceeds this threshold.
-    # Lower than traefik because authmiddleware is called per-request (synchronous
-    # on the hot path), making it more sensitive to load than connection count alone.
-    targetOpenConnections: "50"
+    # >= traefik's threshold: every connection authmiddleware sees is already an
+    # open connection on traefik, but per connection authmiddleware does far less
+    # work (lightweight cookie checks + simple K8s API calls) than traefik (which
+    # holds WebSocket tunnels and streams payloads), so it tolerates more
+    # connections per pod. Values are pre-load-test estimates.
+    targetOpenConnections: "150"
     prometheusAddress: "http://prometheus-server.monitoring.svc.cluster.local:80"
   # Authmiddleware image settings
   imagePullPolicy: Always
