@@ -149,8 +149,8 @@ var _ = Describe("KEDA timing parameters", func() {
 		Expect(yaml.Unmarshal(data, &chart)).To(Succeed())
 
 		for _, tc := range []struct {
-			name    string
-			polling int
+			name     string
+			polling  int
 			cooldown int
 		}{
 			{componentTraefik, chart.Traefik.Keda.PollingIntervalSeconds, chart.Traefik.Keda.CooldownPeriodSeconds},
