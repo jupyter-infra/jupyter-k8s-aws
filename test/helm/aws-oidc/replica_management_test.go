@@ -15,6 +15,22 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// kedaTimingValues mirrors the keda sub-block in values.yaml for parsing.
+type kedaTimingValues struct {
+	CooldownPeriodSeconds  int `yaml:"cooldownPeriodSeconds"`
+	PollingIntervalSeconds int `yaml:"pollingIntervalSeconds"`
+}
+
+type kedaBlock struct {
+	Keda kedaTimingValues `yaml:"keda"`
+}
+
+type kedaTimingChart struct {
+	Traefik        kedaBlock `yaml:"traefik"`
+	Authmiddleware kedaBlock `yaml:"authmiddleware"`
+	WebApp         kedaBlock `yaml:"webApp"`
+}
+
 var _ = Describe("Replica management", func() {
 	var rootDir string
 
@@ -45,10 +61,18 @@ var _ = Describe("Replica management", func() {
 			Expect(*dep.Spec.Replicas).To(BeEquivalentTo(2))
 		})
 
-		It("should omit replicas when keda.enabled=true", func() {
-			dep := renderDeployment("traefik", helmSetFlag, "traefik.keda.enabled=true")
+		It("should omit replicas when keda.enabled=true and CRD is installed", func() {
+			dep := renderDeployment("traefik",
+				helmSetFlag, "traefik.keda.enabled=true",
+				"--api-versions", "keda.sh/v1alpha1")
 			Expect(dep.Spec.Replicas).To(BeNil(),
-				"traefik Deployment must not set replicas when keda.enabled=true so KEDA owns the count")
+				"traefik Deployment must not set replicas when keda.enabled=true and CRD is present so KEDA owns the count")
+		})
+
+		It("should set replicas when keda.enabled=true but CRD is absent", func() {
+			dep := renderDeployment("traefik", helmSetFlag, "traefik.keda.enabled=true")
+			Expect(dep.Spec.Replicas).NotTo(BeNil(),
+				"traefik Deployment must set replicas when keda.enabled=true but CRD is absent to avoid defaulting to 1")
 		})
 	})
 
@@ -61,12 +85,21 @@ var _ = Describe("Replica management", func() {
 			Expect(*dep.Spec.Replicas).To(BeEquivalentTo(2))
 		})
 
-		It("should omit replicas when keda.enabled=true", func() {
+		It("should omit replicas when keda.enabled=true and CRD is installed", func() {
+			dep := renderDeployment("authmiddleware",
+				helmSetFlag, "authmiddleware.enabled=true",
+				helmSetFlag, "authmiddleware.keda.enabled=true",
+				"--api-versions", "keda.sh/v1alpha1")
+			Expect(dep.Spec.Replicas).To(BeNil(),
+				"authmiddleware Deployment must not set replicas when keda.enabled=true and CRD is present so KEDA owns the count")
+		})
+
+		It("should set replicas when keda.enabled=true but CRD is absent", func() {
 			dep := renderDeployment("authmiddleware",
 				helmSetFlag, "authmiddleware.enabled=true",
 				helmSetFlag, "authmiddleware.keda.enabled=true")
-			Expect(dep.Spec.Replicas).To(BeNil(),
-				"authmiddleware Deployment must not set replicas when keda.enabled=true so KEDA owns the count")
+			Expect(dep.Spec.Replicas).NotTo(BeNil(),
+				"authmiddleware Deployment must set replicas when keda.enabled=true but CRD is absent to avoid defaulting to 1")
 		})
 	})
 
@@ -79,12 +112,52 @@ var _ = Describe("Replica management", func() {
 			Expect(*dep.Spec.Replicas).To(BeEquivalentTo(2))
 		})
 
-		It("should omit replicas when keda.enabled=true", func() {
+		It("should omit replicas when keda.enabled=true and CRD is installed", func() {
+			dep := renderDeployment("web-app",
+				helmSetFlag, "webApp.enabled=true",
+				helmSetFlag, "webApp.keda.enabled=true",
+				"--api-versions", "keda.sh/v1alpha1")
+			Expect(dep.Spec.Replicas).To(BeNil(),
+				"web-app Deployment must not set replicas when keda.enabled=true and CRD is present so KEDA owns the count")
+		})
+
+		It("should set replicas when keda.enabled=true but CRD is absent", func() {
 			dep := renderDeployment("web-app",
 				helmSetFlag, "webApp.enabled=true",
 				helmSetFlag, "webApp.keda.enabled=true")
-			Expect(dep.Spec.Replicas).To(BeNil(),
-				"web-app Deployment must not set replicas when keda.enabled=true so KEDA owns the count")
+			Expect(dep.Spec.Replicas).NotTo(BeNil(),
+				"web-app Deployment must set replicas when keda.enabled=true but CRD is absent to avoid defaulting to 1")
 		})
+	})
+})
+
+var _ = Describe("KEDA timing parameters", func() {
+	It("pollingIntervalSeconds < cooldownPeriodSeconds for all components", func() {
+		rootDir, err := filepath.Abs("../../..")
+		Expect(err).NotTo(HaveOccurred())
+
+		data, err := os.ReadFile(filepath.Join(rootDir, "charts/aws-oidc/values.yaml"))
+		Expect(err).NotTo(HaveOccurred())
+
+		var chart kedaTimingChart
+		Expect(yaml.Unmarshal(data, &chart)).To(Succeed())
+
+		for _, tc := range []struct {
+			name    string
+			polling int
+			cooldown int
+		}{
+			{"traefik", chart.Traefik.Keda.PollingIntervalSeconds, chart.Traefik.Keda.CooldownPeriodSeconds},
+			{"authmiddleware", chart.Authmiddleware.Keda.PollingIntervalSeconds, chart.Authmiddleware.Keda.CooldownPeriodSeconds},
+			{"webApp", chart.WebApp.Keda.PollingIntervalSeconds, chart.WebApp.Keda.CooldownPeriodSeconds},
+		} {
+			Expect(tc.polling).To(BeNumerically(">", 0),
+				"%s: pollingIntervalSeconds must be a positive integer", tc.name)
+			Expect(tc.cooldown).To(BeNumerically(">", 0),
+				"%s: cooldownPeriodSeconds must be a positive integer", tc.name)
+			Expect(tc.polling).To(BeNumerically("<", tc.cooldown),
+				"%s: pollingIntervalSeconds (%d) must be less than cooldownPeriodSeconds (%d)",
+				tc.name, tc.polling, tc.cooldown)
+		}
 	})
 })

@@ -16,8 +16,11 @@ spec:
     name: authmiddleware
   minReplicaCount: {{ .Values.authmiddleware.keda.minReplicas }}
   maxReplicaCount: {{ .Values.authmiddleware.keda.maxReplicas }}
-  cooldownPeriod: {{ .Values.authmiddleware.keda.cooldownPeriod }}
-  pollingInterval: {{ .Values.authmiddleware.keda.pollingInterval }}
+  cooldownPeriod: {{ .Values.authmiddleware.keda.cooldownPeriodSeconds }}
+  pollingInterval: {{ .Values.authmiddleware.keda.pollingIntervalSeconds }}
+  fallback:
+    failureThreshold: 3
+    replicas: {{ .Values.authmiddleware.keda.minReplicas }}
   triggers:
     - type: prometheus
       metadata:

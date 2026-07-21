@@ -77,10 +77,10 @@ traefik:
     enabled: false
     minReplicas: 2
     maxReplicas: 10
-    # How long to wait after the last scale-up before scaling down (seconds).
-    cooldownPeriod: 300
-    # How often KEDA queries Prometheus for the metric (seconds).
-    pollingInterval: 30
+    # How long to wait after the last scale-up before scaling down.
+    cooldownPeriodSeconds: 300
+    # How often KEDA queries Prometheus for the metric.
+    pollingIntervalSeconds: 30
     # Scale up when average open connections per replica exceeds this threshold.
     targetOpenConnections: "100"
     prometheusAddress: "http://prometheus-server.monitoring.svc.cluster.local:80"
@@ -252,11 +252,11 @@ webApp:
     enabled: false
     minReplicas: 2
     maxReplicas: 20
-    # How long to wait after the last scale-up before scaling down (seconds).
+    # How long to wait after the last scale-up before scaling down.
     # Conservative — UI availability matters more than tight bin-packing.
-    cooldownPeriod: 300
-    # How often KEDA queries Prometheus for the metric (seconds).
-    pollingInterval: 30
+    cooldownPeriodSeconds: 300
+    # How often KEDA queries Prometheus for the metric.
+    pollingIntervalSeconds: 30
     # Scale up when average open connections per replica exceeds this threshold.
     # Higher than traefik/authmiddleware — web-app is stateless and lightweight,
     # handling more concurrent sessions per pod.
@@ -318,10 +318,10 @@ authmiddleware:
     enabled: false
     minReplicas: 2
     maxReplicas: 5
-    # How long to wait after the last scale-up before scaling down (seconds).
-    cooldownPeriod: 300
-    # How often KEDA queries Prometheus for the metric (seconds).
-    pollingInterval: 30
+    # How long to wait after the last scale-up before scaling down.
+    cooldownPeriodSeconds: 300
+    # How often KEDA queries Prometheus for the metric.
+    pollingIntervalSeconds: 30
     # Scale up when average open connections per replica exceeds this threshold.
     # >= traefik's threshold: every connection authmiddleware sees is already an
     # open connection on traefik, but per connection authmiddleware does far less

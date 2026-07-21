@@ -10,14 +10,17 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     app: web-app
-    component: router
+    component: web-app
 spec:
   scaleTargetRef:
     name: web-app
   minReplicaCount: {{ .Values.webApp.keda.minReplicas }}
   maxReplicaCount: {{ .Values.webApp.keda.maxReplicas }}
-  cooldownPeriod: {{ .Values.webApp.keda.cooldownPeriod }}
-  pollingInterval: {{ .Values.webApp.keda.pollingInterval }}
+  cooldownPeriod: {{ .Values.webApp.keda.cooldownPeriodSeconds }}
+  pollingInterval: {{ .Values.webApp.keda.pollingIntervalSeconds }}
+  fallback:
+    failureThreshold: 3
+    replicas: {{ .Values.webApp.keda.minReplicas }}
   triggers:
     - type: prometheus
       metadata:

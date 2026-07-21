@@ -7,7 +7,7 @@ metadata:
     app: traefik
     component: router
 spec:
-  {{- if not .Values.traefik.keda.enabled }}
+  {{- if not (and .Values.traefik.keda.enabled (.Capabilities.APIVersions.Has "keda.sh/v1alpha1")) }}
   replicas: {{ .Values.traefik.replicas }}
   {{- end }}
   selector:
