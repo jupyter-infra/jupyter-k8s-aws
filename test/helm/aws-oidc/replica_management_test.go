@@ -15,6 +15,12 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const (
+	componentTraefik        = "traefik"
+	componentAuthmiddleware = "authmiddleware"
+	componentWebApp         = "web-app"
+)
+
 // kedaTimingValues mirrors the keda sub-block in values.yaml for parsing.
 type kedaTimingValues struct {
 	CooldownPeriodSeconds  int `yaml:"cooldownPeriodSeconds"`
@@ -55,14 +61,14 @@ var _ = Describe("Replica management", func() {
 
 	Context("traefik", func() {
 		It("should set replicas when keda.enabled=false (default)", func() {
-			dep := renderDeployment("traefik")
+			dep := renderDeployment(componentTraefik)
 			Expect(dep.Spec.Replicas).NotTo(BeNil(),
 				"traefik Deployment should set replicas when keda is disabled (default)")
 			Expect(*dep.Spec.Replicas).To(BeEquivalentTo(2))
 		})
 
 		It("should omit replicas when keda.enabled=true and CRD is installed", func() {
-			dep := renderDeployment("traefik",
+			dep := renderDeployment(componentTraefik,
 				helmSetFlag, "traefik.keda.enabled=true",
 				"--api-versions", "keda.sh/v1alpha1")
 			Expect(dep.Spec.Replicas).To(BeNil(),
@@ -70,7 +76,7 @@ var _ = Describe("Replica management", func() {
 		})
 
 		It("should set replicas when keda.enabled=true but CRD is absent", func() {
-			dep := renderDeployment("traefik", helmSetFlag, "traefik.keda.enabled=true")
+			dep := renderDeployment(componentTraefik, helmSetFlag, "traefik.keda.enabled=true")
 			Expect(dep.Spec.Replicas).NotTo(BeNil(),
 				"traefik Deployment must set replicas when keda.enabled=true but CRD is absent to avoid defaulting to 1")
 		})
@@ -78,7 +84,7 @@ var _ = Describe("Replica management", func() {
 
 	Context("authmiddleware", func() {
 		It("should set replicas when keda.enabled=false (default)", func() {
-			dep := renderDeployment("authmiddleware",
+			dep := renderDeployment(componentAuthmiddleware,
 				helmSetFlag, "authmiddleware.enabled=true")
 			Expect(dep.Spec.Replicas).NotTo(BeNil(),
 				"authmiddleware Deployment should set replicas when keda is disabled (default)")
@@ -86,7 +92,7 @@ var _ = Describe("Replica management", func() {
 		})
 
 		It("should omit replicas when keda.enabled=true and CRD is installed", func() {
-			dep := renderDeployment("authmiddleware",
+			dep := renderDeployment(componentAuthmiddleware,
 				helmSetFlag, "authmiddleware.enabled=true",
 				helmSetFlag, "authmiddleware.keda.enabled=true",
 				"--api-versions", "keda.sh/v1alpha1")
@@ -95,7 +101,7 @@ var _ = Describe("Replica management", func() {
 		})
 
 		It("should set replicas when keda.enabled=true but CRD is absent", func() {
-			dep := renderDeployment("authmiddleware",
+			dep := renderDeployment(componentAuthmiddleware,
 				helmSetFlag, "authmiddleware.enabled=true",
 				helmSetFlag, "authmiddleware.keda.enabled=true")
 			Expect(dep.Spec.Replicas).NotTo(BeNil(),
@@ -105,7 +111,7 @@ var _ = Describe("Replica management", func() {
 
 	Context("web-app", func() {
 		It("should set replicas when keda.enabled=false (default)", func() {
-			dep := renderDeployment("web-app",
+			dep := renderDeployment(componentWebApp,
 				helmSetFlag, "webApp.enabled=true")
 			Expect(dep.Spec.Replicas).NotTo(BeNil(),
 				"web-app Deployment should set replicas when keda is disabled (default)")
@@ -113,7 +119,7 @@ var _ = Describe("Replica management", func() {
 		})
 
 		It("should omit replicas when keda.enabled=true and CRD is installed", func() {
-			dep := renderDeployment("web-app",
+			dep := renderDeployment(componentWebApp,
 				helmSetFlag, "webApp.enabled=true",
 				helmSetFlag, "webApp.keda.enabled=true",
 				"--api-versions", "keda.sh/v1alpha1")
@@ -122,7 +128,7 @@ var _ = Describe("Replica management", func() {
 		})
 
 		It("should set replicas when keda.enabled=true but CRD is absent", func() {
-			dep := renderDeployment("web-app",
+			dep := renderDeployment(componentWebApp,
 				helmSetFlag, "webApp.enabled=true",
 				helmSetFlag, "webApp.keda.enabled=true")
 			Expect(dep.Spec.Replicas).NotTo(BeNil(),
@@ -147,9 +153,9 @@ var _ = Describe("KEDA timing parameters", func() {
 			polling int
 			cooldown int
 		}{
-			{"traefik", chart.Traefik.Keda.PollingIntervalSeconds, chart.Traefik.Keda.CooldownPeriodSeconds},
-			{"authmiddleware", chart.Authmiddleware.Keda.PollingIntervalSeconds, chart.Authmiddleware.Keda.CooldownPeriodSeconds},
-			{"webApp", chart.WebApp.Keda.PollingIntervalSeconds, chart.WebApp.Keda.CooldownPeriodSeconds},
+			{componentTraefik, chart.Traefik.Keda.PollingIntervalSeconds, chart.Traefik.Keda.CooldownPeriodSeconds},
+			{componentAuthmiddleware, chart.Authmiddleware.Keda.PollingIntervalSeconds, chart.Authmiddleware.Keda.CooldownPeriodSeconds},
+			{componentWebApp, chart.WebApp.Keda.PollingIntervalSeconds, chart.WebApp.Keda.CooldownPeriodSeconds},
 		} {
 			Expect(tc.polling).To(BeNumerically(">", 0),
 				"%s: pollingIntervalSeconds must be a positive integer", tc.name)
