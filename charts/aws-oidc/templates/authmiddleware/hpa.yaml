@@ -18,9 +18,6 @@ spec:
   maxReplicaCount: {{ .Values.authmiddleware.keda.maxReplicas }}
   cooldownPeriod: {{ .Values.authmiddleware.keda.cooldownPeriodSeconds }}
   pollingInterval: {{ .Values.authmiddleware.keda.pollingIntervalSeconds }}
-  fallback:
-    failureThreshold: 3
-    replicas: {{ .Values.authmiddleware.keda.minReplicas }}
   triggers:
     - type: prometheus
       metadata:

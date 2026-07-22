@@ -59,6 +59,24 @@ var _ = Describe("Replica management", func() {
 		return dep
 	}
 
+	// scaledObjectFile maps component to its ScaledObject template filename.
+	scaledObjectFile := map[string]string{
+		componentTraefik:        "hpa.yaml",
+		componentAuthmiddleware: "hpa.yaml",
+		componentWebApp:         "scaledobject.yaml",
+	}
+
+	scaledObjectExists := func(component string, extraArgs ...string) bool {
+		outputDir := GinkgoT().TempDir()
+		chartDir := GinkgoT().TempDir()
+		copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+		args := append(oidcRequiredArgs(), extraArgs...)
+		helmTemplate(chartDir, outputDir, args...)
+		path := filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates", component, scaledObjectFile[component])
+		_, err := os.Stat(path)
+		return err == nil
+	}
+
 	Context("traefik", func() {
 		It("should set replicas when keda.enabled=false (default)", func() {
 			dep := renderDeployment(componentTraefik)
@@ -79,6 +97,23 @@ var _ = Describe("Replica management", func() {
 			dep := renderDeployment(componentTraefik, helmSetFlag, "traefik.keda.enabled=true")
 			Expect(dep.Spec.Replicas).NotTo(BeNil(),
 				"traefik Deployment must set replicas when keda.enabled=true but CRD is absent to avoid defaulting to 1")
+		})
+
+		It("should render ScaledObject when keda.enabled=true and CRD is installed", func() {
+			Expect(scaledObjectExists(componentTraefik,
+				helmSetFlag, "traefik.keda.enabled=true",
+				"--api-versions", "keda.sh/v1alpha1")).To(BeTrue(),
+				"traefik ScaledObject must be rendered when keda.enabled=true and CRD is present")
+		})
+
+		It("should not render ScaledObject when keda.enabled=false", func() {
+			Expect(scaledObjectExists(componentTraefik)).To(BeFalse(),
+				"traefik ScaledObject must not be rendered when keda is disabled")
+		})
+
+		It("should not render ScaledObject when keda.enabled=true but CRD is absent", func() {
+			Expect(scaledObjectExists(componentTraefik, helmSetFlag, "traefik.keda.enabled=true")).To(BeFalse(),
+				"traefik ScaledObject must not be rendered when CRD is absent")
 		})
 	})
 
@@ -107,6 +142,27 @@ var _ = Describe("Replica management", func() {
 			Expect(dep.Spec.Replicas).NotTo(BeNil(),
 				"authmiddleware Deployment must set replicas when keda.enabled=true but CRD is absent to avoid defaulting to 1")
 		})
+
+		It("should render ScaledObject when keda.enabled=true and CRD is installed", func() {
+			Expect(scaledObjectExists(componentAuthmiddleware,
+				helmSetFlag, "authmiddleware.enabled=true",
+				helmSetFlag, "authmiddleware.keda.enabled=true",
+				"--api-versions", "keda.sh/v1alpha1")).To(BeTrue(),
+				"authmiddleware ScaledObject must be rendered when keda.enabled=true and CRD is present")
+		})
+
+		It("should not render ScaledObject when keda.enabled=false", func() {
+			Expect(scaledObjectExists(componentAuthmiddleware,
+				helmSetFlag, "authmiddleware.enabled=true")).To(BeFalse(),
+				"authmiddleware ScaledObject must not be rendered when keda is disabled")
+		})
+
+		It("should not render ScaledObject when keda.enabled=true but CRD is absent", func() {
+			Expect(scaledObjectExists(componentAuthmiddleware,
+				helmSetFlag, "authmiddleware.enabled=true",
+				helmSetFlag, "authmiddleware.keda.enabled=true")).To(BeFalse(),
+				"authmiddleware ScaledObject must not be rendered when CRD is absent")
+		})
 	})
 
 	Context("web-app", func() {
@@ -133,6 +189,27 @@ var _ = Describe("Replica management", func() {
 				helmSetFlag, "webApp.keda.enabled=true")
 			Expect(dep.Spec.Replicas).NotTo(BeNil(),
 				"web-app Deployment must set replicas when keda.enabled=true but CRD is absent to avoid defaulting to 1")
+		})
+
+		It("should render ScaledObject when keda.enabled=true and CRD is installed", func() {
+			Expect(scaledObjectExists(componentWebApp,
+				helmSetFlag, "webApp.enabled=true",
+				helmSetFlag, "webApp.keda.enabled=true",
+				"--api-versions", "keda.sh/v1alpha1")).To(BeTrue(),
+				"web-app ScaledObject must be rendered when keda.enabled=true and CRD is present")
+		})
+
+		It("should not render ScaledObject when keda.enabled=false", func() {
+			Expect(scaledObjectExists(componentWebApp,
+				helmSetFlag, "webApp.enabled=true")).To(BeFalse(),
+				"web-app ScaledObject must not be rendered when keda is disabled")
+		})
+
+		It("should not render ScaledObject when keda.enabled=true but CRD is absent", func() {
+			Expect(scaledObjectExists(componentWebApp,
+				helmSetFlag, "webApp.enabled=true",
+				helmSetFlag, "webApp.keda.enabled=true")).To(BeFalse(),
+				"web-app ScaledObject must not be rendered when CRD is absent")
 		})
 	})
 })

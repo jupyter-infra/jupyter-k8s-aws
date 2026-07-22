@@ -201,9 +201,6 @@ oauth2Proxy:
   nodeSelector: {}
   # Tolerations for oauth2-proxy pods (overrides chart-level tolerations)
   tolerations: []
-  # oauth2-proxy is a control-plane singleton (handles login flows only, not per-request auth).
-  # Horizontal scaling requires shared session state — kept as a fixed replica count for now.
-  replicas: 1
   # Cookie secret for OAuth2 Proxy (generate with openssl rand -base64 32 | tr -- '+/' '-_')
   cookieSecret: ""
   # Cookie expiry duration (Go duration string, e.g. "8h", "1h30m")

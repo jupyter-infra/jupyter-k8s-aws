@@ -18,11 +18,10 @@ spec:
   maxReplicaCount: {{ .Values.traefik.keda.maxReplicas }}
   cooldownPeriod: {{ .Values.traefik.keda.cooldownPeriodSeconds }}
   pollingInterval: {{ .Values.traefik.keda.pollingIntervalSeconds }}
-  # Fall back to minReplicas if Prometheus is unreachable so the tier stays
-  # available rather than freezing at the last known replica count.
-  fallback:
-    failureThreshold: 3
-    replicas: {{ .Values.traefik.keda.minReplicas }}
+  # No fallback block: KEDA's default behavior on metric-fetch failure is to
+  # freeze at the last known replica count (fail-open). An explicit fallback
+  # would converge to a static value, scaling the tier DOWN during a Prometheus
+  # outage — the opposite of fail-open.
   triggers:
     - type: prometheus
       metadata:
