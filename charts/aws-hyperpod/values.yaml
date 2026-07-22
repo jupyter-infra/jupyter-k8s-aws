@@ -156,6 +156,12 @@ storageClass:
       fsType: ext4
       encrypted: "true"
 
+# [RAY INTEGRATION]: Installs the "ray-integration" WorkspaceIntegrationTemplate, which lets a
+# workspace attach to a KubeRay RayCluster by name. Admin-installed once; disabled by default so it
+# only ships where KubeRay (the ray.io/v1 RayCluster CRD) is present.
+rayIntegration:
+  enabled: false
+
 # Traefik subchart configuration
 traefik:
   service:
