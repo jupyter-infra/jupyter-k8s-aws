@@ -1,8 +1,11 @@
 # [AWS OIDC]: Configuration for aws-oidc deployment mode
 
-# Node selector labels applied to all chart component pods (default: no constraint)
+# Node selector labels applied to all chart component pods (default: no constraint).
+# Set per deployment to pin pods to specific nodes; overridable per-component below.
 nodeSelector: {}
-# Tolerations applied to all chart component pods (default: none)
+
+# Tolerations applied to all chart component pods (default: none).
+# Set per deployment when target nodes carry taints; overridable per-component below.
 tolerations: []
 
 # Init container image used for readiness checks
@@ -65,8 +68,22 @@ traefik:
   imageName: traefik
   # Traefik deployment image tag
   imageTag: v3.7.7
-  # Number of traefik replicas
-  replicas: 1
+  # Number of traefik replicas (used when keda.enabled is false)
+  replicas: 2
+  # KEDA ScaledObject configuration — scales Traefik based on open connections.
+  # Opt-in: enable only on clusters that have the KEDA operator + CRDs and a
+  # Prometheus reachable at prometheusAddress below.
+  keda:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    # How long to wait before scale-to-zero (inert when minReplicas >= 1).
+    cooldownPeriodSeconds: 300
+    # How often KEDA queries Prometheus for the metric.
+    pollingIntervalSeconds: 30
+    # Scale up when average open connections per replica exceeds this threshold.
+    targetOpenConnections: "100"
+    prometheusAddress: "http://prometheus-server.monitoring.svc.cluster.local:80"
   # Redirect HTTP to HTTPS
   redirectHttp: true
   # Whether to configure traefik at 'debug' log level ('info' if omitted)
@@ -80,7 +97,7 @@ traefik:
 
 # Dex configuration
 dex:
-  # Number of dex replicas
+  # Number of dex replicas (static — auth only, negligible load)
   replicas: 1
   # Dex image settings
   repository: ghcr.io/dexidp/dex
@@ -222,7 +239,25 @@ webApp:
   tolerations: []
   # Enable or disable the web UI (default: true)
   enabled: true
+  # replicas is used only when keda.enabled is false
   replicas: 2
+  # KEDA ScaledObject configuration — scales web-app based on Traefik open
+  # connections. web-app has no /metrics endpoint, so Traefik's connection count
+  # is used as a proxy for active user sessions.
+  # Opt-in: see traefik.keda notes on cluster prerequisites.
+  keda:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 20
+    # How long to wait before scale-to-zero (inert when minReplicas >= 1).
+    cooldownPeriodSeconds: 300
+    # How often KEDA queries Prometheus for the metric.
+    pollingIntervalSeconds: 30
+    # Scale up when average open connections per replica exceeds this threshold.
+    # Higher than traefik/authmiddleware — web-app is stateless and lightweight,
+    # handling more concurrent sessions per pod.
+    targetOpenConnections: "200"
+    prometheusAddress: "http://prometheus-server.monitoring.svc.cluster.local:80"
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-ui
@@ -269,8 +304,28 @@ authmiddleware:
   tolerations: []
   # Whether to deploy the authmiddleware component
   enabled: true
-  # Number of replicas
-  replicas: 1
+  # Number of replicas (used when keda.enabled is false)
+  replicas: 2
+  # KEDA ScaledObject configuration — scales authmiddleware based on Traefik open
+  # connections. authmiddleware is a ForwardAuth called on every workspace request
+  # with no session cookie bypass, so it scales with active workspace sessions.
+  # Opt-in: see traefik.keda notes on cluster prerequisites.
+  keda:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    # How long to wait before scale-to-zero (inert when minReplicas >= 1).
+    cooldownPeriodSeconds: 300
+    # How often KEDA queries Prometheus for the metric.
+    pollingIntervalSeconds: 30
+    # Scale up when average open connections per replica exceeds this threshold.
+    # >= traefik's threshold: every connection authmiddleware sees is already an
+    # open connection on traefik, but per connection authmiddleware does far less
+    # work (lightweight cookie checks + simple K8s API calls) than traefik (which
+    # holds WebSocket tunnels and streams payloads), so it tolerates more
+    # connections per pod. Values are pre-load-test estimates.
+    targetOpenConnections: "150"
+    prometheusAddress: "http://prometheus-server.monitoring.svc.cluster.local:80"
   # Authmiddleware image settings
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra

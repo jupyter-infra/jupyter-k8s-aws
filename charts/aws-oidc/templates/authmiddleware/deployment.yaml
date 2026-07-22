@@ -8,7 +8,9 @@ metadata:
     app: authmiddleware
     component: auth
 spec:
+  {{- if not (and .Values.authmiddleware.keda.enabled (.Capabilities.APIVersions.Has "keda.sh/v1alpha1")) }}
   replicas: {{ .Values.authmiddleware.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       app: authmiddleware
@@ -35,6 +37,15 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: authmiddleware
+                topologyKey: kubernetes.io/hostname
       initContainers:
       - name: wait-for-dex
         image: {{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}

@@ -1,0 +1,52 @@
+{{- /* Render only when KEDA is enabled AND its CRD is installed. The CRD check
+       degrades a missing KEDA install to "no autoscaler" instead of a hard
+       `no matches for kind "ScaledObject"` helm failure. Clusters without the
+       KEDA operator simply skip this resource. */ -}}
+{{- if and .Values.traefik.keda.enabled (.Capabilities.APIVersions.Has "keda.sh/v1alpha1") }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: traefik
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: traefik
+    component: router
+spec:
+  scaleTargetRef:
+    name: traefik
+  minReplicaCount: {{ .Values.traefik.keda.minReplicas }}
+  maxReplicaCount: {{ .Values.traefik.keda.maxReplicas }}
+  cooldownPeriod: {{ .Values.traefik.keda.cooldownPeriodSeconds }}
+  pollingInterval: {{ .Values.traefik.keda.pollingIntervalSeconds }}
+  # No fallback block: KEDA's default behavior on metric-fetch failure is to
+  # freeze at the last known replica count (fail-open). An explicit fallback
+  # would converge to a static value, scaling the tier DOWN during a Prometheus
+  # outage — the opposite of fail-open.
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.traefik.keda.prometheusAddress }}
+        # Total open connections across the websecure entrypoint. Each active
+        # workspace holds a persistent WebSocket, so this is the right signal for
+        # Traefik scaling.
+        #
+        # Caveats:
+        # - assumes this Traefik only fronts jupyter-k8s traffic. If it ever serves
+        #   unrelated traffic on websecure, that inflates the count and this signal
+        #   would need an entrypoint/router filter.
+        # - scales on connection count, not throughput. Large file transfers,
+        #   media-rich content, or high-volume log streaming can saturate node
+        #   network bandwidth well below the connection threshold. If that shows up
+        #   in load tests, add a bandwidth-based trigger and spread Traefik pods
+        #   across nodes (pod anti-affinity already prefers this).
+        #
+        # This is the RAW total, not a per-pod average. metricType defaults to
+        # AverageValue, so KEDA/HPA divides this by the Traefik replica count
+        # before comparing to threshold — desiredReplicas = ceil(total / threshold).
+        # Do NOT add "/ count(...)" here: that would divide by pod count a second
+        # time, so the loop would converge at sqrt(total/threshold) and under-scale
+        # under exactly the load this exists to handle.
+        query: sum(traefik_open_connections{entrypoint="websecure"})
+        # Target open connections per Traefik pod.
+        threshold: {{ .Values.traefik.keda.targetOpenConnections | quote }}
+{{- end }}

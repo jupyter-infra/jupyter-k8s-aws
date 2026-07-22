@@ -1,0 +1,52 @@
+{{- /* Render only when KEDA is enabled AND its CRD is installed. The CRD check
+       degrades a missing KEDA install to "no autoscaler" instead of a hard
+       `no matches for kind "ScaledObject"` helm failure. Clusters without the
+       KEDA operator simply skip this resource. */ -}}
+{{- if and .Values.webApp.keda.enabled (.Capabilities.APIVersions.Has "keda.sh/v1alpha1") }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: web-app
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: web-app
+    component: web-app
+spec:
+  scaleTargetRef:
+    name: web-app
+  minReplicaCount: {{ .Values.webApp.keda.minReplicas }}
+  maxReplicaCount: {{ .Values.webApp.keda.maxReplicas }}
+  cooldownPeriod: {{ .Values.webApp.keda.cooldownPeriodSeconds }}
+  pollingInterval: {{ .Values.webApp.keda.pollingIntervalSeconds }}
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.webApp.keda.prometheusAddress }}
+        # Total open connections on Traefik's websecure entrypoint, used as a
+        # proxy for active user sessions.
+        #
+        # Why open connections, not request rate:
+        # web-app does not expose a /metrics endpoint (Bun server). Using Traefik's
+        # open connections as a proxy is correct because every active user session
+        # has a persistent connection through Traefik's websecure entrypoint, and
+        # web-app serves all UI and API traffic for those sessions. Connection count
+        # scales linearly with active users.
+        #
+        # web-app has a higher threshold than traefik/authmiddleware because it is
+        # a lightweight stateless server — each connection generates less per-pod
+        # work than Traefik (which holds WebSocket tunnels) or authmiddleware (which
+        # is called synchronously on every workspace request).
+        #
+        # Caveat: scales on connection count only, not CPU/memory. Fine as long as
+        # web-app resources are sized for the per-connection work; revisit if a
+        # load test shows resource pressure before the connection threshold trips.
+        #
+        # This is the RAW total. metricType defaults to AverageValue, so KEDA/HPA
+        # divides it by the web-app replica count before comparing to threshold —
+        # desiredReplicas = ceil(total / threshold). Do NOT add "/ count(...)": the
+        # numerator counts Traefik series, so dividing here would scale web-app on
+        # Traefik's pod count instead of its own.
+        query: sum(traefik_open_connections{entrypoint="websecure"})
+        # Target open connections per web-app pod.
+        threshold: {{ .Values.webApp.keda.targetOpenConnections | quote }}
+{{- end }}

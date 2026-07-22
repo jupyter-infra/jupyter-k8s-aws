@@ -8,7 +8,9 @@ metadata:
     app: web-app
     component: web-app
 spec:
+  {{- if not (and .Values.webApp.keda.enabled (.Capabilities.APIVersions.Has "keda.sh/v1alpha1")) }}
   replicas: {{ .Values.webApp.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       app: web-app
@@ -27,6 +29,15 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: web-app
+                topologyKey: kubernetes.io/hostname
       containers:
       - name: web-app
         image: {{ .Values.webApp.repository }}/{{ .Values.webApp.imageName }}:{{ .Values.webApp.imageTag }}

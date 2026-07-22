@@ -1,0 +1,3 @@
+# oauth2-proxy is a control-plane singleton (handles login flows only, not per-request auth).
+# Horizontal scaling requires shared session state — kept as a fixed replica count.
+# No HPA or KEDA ScaledObject for oauth2-proxy.
