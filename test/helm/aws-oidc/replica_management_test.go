@@ -85,8 +85,8 @@ var _ = Describe("Replica management", func() {
 		valuesKey  string
 		enableArgs []string
 	}{
-		{componentTraefik, "traefik", nil},
-		{componentAuthmiddleware, "authmiddleware", []string{helmSetFlag, "authmiddleware.enabled=true"}},
+		{componentTraefik, componentTraefik, nil},
+		{componentAuthmiddleware, componentAuthmiddleware, []string{helmSetFlag, componentAuthmiddleware + ".enabled=true"}},
 		{componentWebApp, "webApp", []string{helmSetFlag, "webApp.enabled=true"}},
 	} {
 		kedaEnabled := tc.valuesKey + ".keda.enabled=true"

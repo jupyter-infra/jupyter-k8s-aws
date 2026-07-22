@@ -38,7 +38,7 @@ var _ = Describe("Dex", func() {
 					}
 					for _, expr := range peer.PodSelector.MatchExpressions {
 						if expr.Key == "app" && expr.Operator == metav1.LabelSelectorOpIn &&
-							containsAll(expr.Values, "oauth2-proxy", "authmiddleware") {
+							containsAll(expr.Values, "oauth2-proxy", componentAuthmiddleware) {
 							gate = rule
 						}
 					}

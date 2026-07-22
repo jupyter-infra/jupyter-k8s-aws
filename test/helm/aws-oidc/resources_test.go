@@ -99,7 +99,7 @@ var _ = Describe("AWS OIDC Resources", func() {
 		// Read the rendered secret
 		secretPath := filepath.Join(
 			rootDir, "dist", "test-output", "aws-oidc", "jupyter-k8s-aws-oidc",
-			"templates", "authmiddleware", "secrets.yaml")
+			"templates", componentAuthmiddleware, "secrets.yaml")
 
 		secretBytes, err := os.ReadFile(secretPath)
 		Expect(err).NotTo(HaveOccurred())
@@ -136,7 +136,7 @@ var _ = Describe("AWS OIDC Resources", func() {
 
 		rbacPath := filepath.Join(
 			rootDir, "dist", "test-output", "aws-oidc", "jupyter-k8s-aws-oidc",
-			"templates", "authmiddleware", "rbac.yaml")
+			"templates", componentAuthmiddleware, "rbac.yaml")
 
 		rbacBytes, err := os.ReadFile(rbacPath)
 		Expect(err).NotTo(HaveOccurred())

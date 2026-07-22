@@ -42,7 +42,7 @@ var _ = Describe("Network Policy Consistency", func() {
 	// friction so the shared invariants are a conscious decision.
 	components := []behindTraefikPolicy{
 		{"dex", "dex/network-policy.yaml", "dex", "oauth", 5556},
-		{"authmiddleware", "authmiddleware/network-policy.yaml", "authmiddleware", "auth", 8080},
+		{componentAuthmiddleware, componentAuthmiddleware + "/network-policy.yaml", componentAuthmiddleware, "auth", 8080},
 		{"oauth2-proxy", "oauth2-proxy/network-policy.yaml", "oauth2-proxy", "auth", 4180},
 		{webAppComponent, webAppComponent + "/network-policy.yaml", webAppComponent, webAppComponent, 8090},
 	}
