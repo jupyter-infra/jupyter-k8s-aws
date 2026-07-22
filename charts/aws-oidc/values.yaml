@@ -77,7 +77,7 @@ traefik:
     enabled: false
     minReplicas: 2
     maxReplicas: 10
-    # How long to wait after the last scale-up before scaling down.
+    # How long to wait before scale-to-zero (inert when minReplicas >= 1).
     cooldownPeriodSeconds: 300
     # How often KEDA queries Prometheus for the metric.
     pollingIntervalSeconds: 30
@@ -252,8 +252,7 @@ webApp:
     enabled: false
     minReplicas: 2
     maxReplicas: 20
-    # How long to wait after the last scale-up before scaling down.
-    # Conservative — UI availability matters more than tight bin-packing.
+    # How long to wait before scale-to-zero (inert when minReplicas >= 1).
     cooldownPeriodSeconds: 300
     # How often KEDA queries Prometheus for the metric.
     pollingIntervalSeconds: 30
@@ -318,7 +317,7 @@ authmiddleware:
     enabled: false
     minReplicas: 2
     maxReplicas: 5
-    # How long to wait after the last scale-up before scaling down.
+    # How long to wait before scale-to-zero (inert when minReplicas >= 1).
     cooldownPeriodSeconds: 300
     # How often KEDA queries Prometheus for the metric.
     pollingIntervalSeconds: 30
