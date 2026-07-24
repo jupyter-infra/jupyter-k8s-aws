@@ -161,6 +161,25 @@ storageClass:
 # only ships where KubeRay (the ray.io/v1 RayCluster CRD) is present.
 rayIntegration:
   enabled: false
+  # ray-sidecar object store (plasma) sizing. objectStoreMemory is pinned explicitly (Ray's
+  # in-container auto-sizing is non-deterministic) and MUST stay coupled: objectStoreMemory <=
+  # devShmSizeLimit <= (sidecar memory limit - raylet overhead). Raise all three together for
+  # workloads that pull large Ray Data results back into the workspace.
+  objectStoreMemory: "1073741824"   # 1Gi, in bytes (quoted: Helm renders a bare large int in scientific notation, which Ray rejects)
+  devShmSizeLimit: 1Gi            # /dev/shm tmpfs; must be >= objectStoreMemory or Ray fails to start
+  sidecar:
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "512Mi"
+      limits:
+        cpu: "1"
+        memory: "1536Mi"       # must cover objectStoreMemory + raylet overhead (~256Mi) + /tmp/ray
+    # uid/gid the sidecar runs as. This MUST match the workspace image's uid so both containers can
+    # share the /tmp/ray session dir. Defaults suit sagemaker-distribution / rayproject/ray (both
+    # uid 1000); override only for a custom workspace image that runs as a different uid.
+    runAsUser: 1000
+    runAsGroup: 100
 
 # Traefik subchart configuration
 traefik:

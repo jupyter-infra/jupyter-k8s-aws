@@ -2,10 +2,10 @@
 #
 # Ray Cluster Integration — WorkspaceIntegrationTemplate (admin-installed, chart-managed)
 #
-# An admin installs this once per cluster; each customer only supplies the RayCluster name (and
-# optionally namespace) via their Workspace's integrationTemplateRefs[].parameters. It injects a
-# "ray-sidecar" that joins the RayCluster as a zero-resource client node, plus the env/volumes the
-# workspace's Ray client needs to attach.
+# An admin installs this once per cluster; each customer only supplies the RayCluster name via their
+# Workspace's integrationTemplateRefs[].parameters. The RayCluster must be in the workspace's own
+# namespace. It injects a "ray-sidecar" that joins the RayCluster as a zero-resource client node,
+# plus the env/volumes the workspace's Ray client needs to attach.
 #
 # HELM ESCAPING: the operator's own Go-template expressions are wrapped in Helm's backtick idiom so
 # Helm renders them through verbatim. Helm evaluates this whole file first (comments included), so
@@ -16,6 +16,12 @@
 # RayCluster head image, so the cluster head image must match the workspace image's Ray/Python.
 # public.ecr.aws/sagemaker/sagemaker-distribution ships both JupyterLab and a matching Ray; the
 # simplest guarantee is to run the RayCluster head on the same Ray/Python as the workspace image.
+# Last tested against Ray 2.55.0 / Python 3.11.
+#   On a mismatch there is no admission error — ray.init() fails at runtime in the workspace with a
+#   version-mismatch message (e.g. "Version mismatch: The cluster was started with Ray <x> / Python
+#   <y>, this process is Ray <a> / Python <b>"). The workspace pod stays healthy (the statusProbe is
+#   report-only); only the Ray attach fails. Fix by aligning the RayCluster head image with the
+#   workspace image.
 #
 # OBJECT STORE / SHARED MEMORY SIZING: Ray's object store (plasma) lives in /dev/shm. Containers
 # default /dev/shm to 64MB, so without intervention Ray spills to /tmp (slow) and warns. In a
@@ -28,6 +34,11 @@
 apiVersion: workspace.jupyter.org/v1alpha1
 kind: WorkspaceIntegrationTemplate
 metadata:
+  # NAME IS A PUBLIC CONTRACT — do not rename. The SageMaker Studio Ray extension references this
+  # WorkspaceIntegrationTemplate by the literal name "ray-integration" when it wires a workspace's
+  # integrationTemplateRefs[]. The declared parameter below (rayClusterName) is likewise part of that
+  # contract — the extension fills it by name. Renaming the template or the parameter silently breaks
+  # the Studio attach flow (the ref resolves to nothing), so treat both as a stable API.
   name: ray-integration
   namespace: {{ .Values.namespace }}
   labels:
@@ -43,8 +54,7 @@ spec:
   # declared one. Both values below are customer-supplied on the Workspace's
   # integrationTemplateRefs[].parameters.
   parameters:
-    - name: rayClusterName        # which RayCluster to join
-    - name: rayClusterNamespace   # its namespace; the UI pre-fills the workspace's own namespace
+    - name: rayClusterName        # which RayCluster to join (resolved in the workspace's own namespace)
 
   # shareProcessNamespace: the workspace container must see the Ray process that runs in the
   # ray-sidecar (the workspace attaches to the local Ray session the sidecar starts). A shared PID
@@ -54,18 +64,16 @@ spec:
   shareProcessNamespace: true
 
   # resourceRefs: fetch the customer-named RayCluster at reconcile time so we can read live values
-  # from it (head image, head service name, GCS port). metadata.name/namespace support templates.
+  # from it (head image, head service name, GCS port). metadata.name supports templates.
   # Each entry has a `name` handle, referenced below as {{`{{ resource "<name>" "<jsonpath>" }}`}}.
+  # The RayCluster always resolves in the workspace's own namespace; cross-namespace references are
+  # not supported.
   resourceRefs:
     - name: rayCluster                    # handle used in template expressions below
       apiVersion: ray.io/v1               # KubeRay RayCluster API group/version
       kind: RayCluster
       metadata:
         name: "{{`{{ .Parameters.rayClusterName }}`}}"        # customer-supplied on the workspace
-        # Namespace of the RayCluster. The UI pre-fills rayClusterNamespace with the workspace's own
-        # namespace (the HyperPod single-tenant-namespace default), but the customer can point at a
-        # RayCluster in another namespace by overriding this parameter.
-        namespace: "{{`{{ .Parameters.rayClusterNamespace }}`}}"
 
   # statusProbe: the operator periodically execs this command in the workspace container and records
   # the verdict in workspace.status.integrationStatuses[]. It is report-only (named statusProbe, not
@@ -111,35 +119,47 @@ spec:
             #        attaches via this dir, so it must be deterministic.
             #   --block  keep ray in the foreground so the container stays alive; on exit k8s restarts
             #        it and it re-resolves the head DNS (this is how head-restart auto-recovery works).
-            - >-
-              ray start
-              --address={{`{{ resource "rayCluster" "{.status.head.serviceName}" }}`}}.{{`{{ .Parameters.rayClusterNamespace }}`}}.svc.cluster.local:{{`{{ resource "rayCluster" "{.status.endpoints.gcs-server}" }}`}}
-              --num-cpus=0
-              --num-gpus=0
-              --object-store-memory=1073741824
-              --temp-dir=/tmp/ray
-              --block
+            #
+            # RETRY LOOP: `ray start` can fail transiently — most commonly when the sidecar starts
+            # before the RayCluster head's GCS is reachable (early attach). Rather than exit and lean
+            # on the kubelet's CrashLoopBackOff (which escalates the restart delay up to ~5m and reads
+            # as a crashing container), we retry in-container on a fixed 10s cadence. --block means a
+            # successful start never returns, so the loop body only runs on failure. Bounded at 30
+            # attempts (~5m) so a genuinely bad reference (wrong cluster name, permanent misconfig)
+            # eventually exits with a clear message instead of spinning forever.
+            - |-
+              n=0
+              until ray start \
+                --address={{`{{ resource "rayCluster" "{.status.head.serviceName}" }}`}}.{{`{{ .Workspace.Namespace }}`}}.svc.cluster.local:{{`{{ resource "rayCluster" "{.status.endpoints.gcs-server}" }}`}} \
+                --num-cpus=0 \
+                --num-gpus=0 \
+                --object-store-memory={{ .Values.rayIntegration.objectStoreMemory }} \
+                --temp-dir=/tmp/ray \
+                --block; do
+                n=$((n+1))
+                if [ "$n" -ge 30 ]; then
+                  echo "ray start did not succeed after $n attempts; giving up so the failure is visible" >&2
+                  exit 1
+                fi
+                echo "ray start failed (attempt $n) - the RayCluster head may not be reachable yet; retrying in 10s" >&2
+                sleep 10
+              done
           resources:
             # NON-ZERO requests (a 0 request makes the sidecar first to be evicted and gives the
-            # scheduler no signal). The memory limit must be >= object-store (1Gi) + raylet overhead
-            # (~256Mi) + the /tmp/ray tmpfs; 1.5Gi covers a 1Gi object store with headroom. These
-            # three are coupled: object-store-memory (1Gi) <= /dev/shm sizeLimit (1Gi) <= covered by
-            # this memory limit. Raise all three together for heavier Ray Data result-pulling.
-            requests:
-              cpu: "250m"
-              memory: "512Mi"
-            limits:
-              cpu: "1"
-              memory: "1536Mi"
+            # scheduler no signal). The memory limit must be >= objectStoreMemory + raylet overhead
+            # (~256Mi) + the /tmp/ray tmpfs. These three are coupled: objectStoreMemory <= /dev/shm
+            # sizeLimit <= covered by this memory limit. Raise all three together (in values.yaml)
+            # for heavier Ray Data result-pulling.
+            {{- toYaml .Values.rayIntegration.sidecar.resources | nindent 12 }}
           securityContext:
-            # runAsUser/Group 1000/100 is an ASSUMPTION about BOTH images: the workspace image and
-            # the resolved sidecar (RayCluster head) image must run as uid 1000 so they share the
+            # runAsUser/Group must match the workspace image's uid so both containers share the
             # /tmp/ray session dir. sagemaker-distribution (sagemaker-user) and rayproject/ray (ray)
-            # both use uid 1000, so this works today — but it is image coupling. If either image uses
-            # a different uid, the workspace cannot read the sidecar's session files and ray.init()
-            # fails. Document this requirement for custom images.
-            runAsUser: 1000
-            runAsGroup: 100
+            # both use uid 1000, so the defaults work today — but it is image coupling. If a custom
+            # workspace image runs as a different uid, override rayIntegration.sidecar.runAsUser/
+            # runAsGroup in values.yaml or the workspace cannot read the sidecar's session files and
+            # ray.init() fails.
+            runAsUser: {{ .Values.rayIntegration.sidecar.runAsUser }}
+            runAsGroup: {{ .Values.rayIntegration.sidecar.runAsGroup }}
             runAsNonRoot: true              # defense-in-depth: never run as root
             allowPrivilegeEscalation: false # defense-in-depth
             capabilities:
@@ -170,12 +190,12 @@ spec:
             medium: Memory
             sizeLimit: 256Mi
         - name: ray-dshm
-          # tmpfs /dev/shm sized to match --object-store-memory (1Gi). medium: Memory means this
-          # counts against container memory, which is why the sidecar memory limit (1536Mi) is sized
-          # to cover it plus the raylet. Keep this == object-store-memory; raise both together.
+          # tmpfs /dev/shm sized to match objectStoreMemory. medium: Memory means this counts against
+          # container memory, which is why the sidecar memory limit is sized to cover it plus the
+          # raylet. Keep devShmSizeLimit >= objectStoreMemory; raise both together (in values.yaml).
           emptyDir:
             medium: Memory
-            sizeLimit: 1Gi
+            sizeLimit: {{ .Values.rayIntegration.devShmSizeLimit }}
       primaryContainerModifications:
         volumeMounts:
           # Mount the SAME session dir into the workspace container so ray.init() (RAY_ADDRESS=auto)
