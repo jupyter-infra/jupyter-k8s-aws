@@ -22,6 +22,16 @@
 #   <y>, this process is Ray <a> / Python <b>"). The workspace pod stays healthy (the statusProbe is
 #   report-only); only the Ray attach fails. Fix by aligning the RayCluster head image with the
 #   workspace image.
+#   GPU workspaces: the same match discipline extends to CUDA — when tensors move between a GPU
+#   workspace and GPU RayCluster workers, the workspace image and the worker image must be
+#   CUDA/driver compatible, not just Ray/Python compatible.
+#
+# GPU WORKSPACES: this integration is a connection broker — Ray compute runs on the RayCluster's
+# worker pods, never on the workspace pod (the sidecar joins num-cpus=0/num-gpus=0). A GPU on the
+# workspace pod is therefore for LOCAL notebook use only; steer Ray GPU work to GPU RayCluster
+# workers via @ray.remote(num_gpus=...). One required fix for GPU workspaces is handled below: the
+# RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO env keeps the workspace's own GPU visible after ray.init()
+# (see the mergeEnv block).
 #
 # OBJECT STORE / SHARED MEMORY SIZING: Ray's object store (plasma) lives in /dev/shm. Containers
 # default /dev/shm to 64MB, so without intervention Ray spills to /tmp (slow) and warns. In a
@@ -29,7 +39,9 @@
 # RAM), so we PIN the object store explicitly and keep three values coupled and consistent:
 #     --object-store-memory  ==  /dev/shm emptyDir sizeLimit  <=  sidecar memory limit (minus overhead)
 # Defaults below use a modest 1Gi object store appropriate for a connection broker. Raise all three
-# together for workloads that pull large Ray Data results back into the workspace.
+# together for workloads that pull large Ray Data results back into the workspace — GPU notebooks
+# that pull large tensors/Ray Data blocks back into the driver typically want 4-8Gi (set
+# rayIntegration.objectStoreMemory + devShmSizeLimit + sidecar.resources.limits.memory together).
 #
 apiVersion: workspace.jupyter.org/v1alpha1
 kind: WorkspaceIntegrationTemplate
@@ -212,6 +224,13 @@ spec:
           # important env var — it is what makes ray.init() succeed from the workspace.
           - name: RAY_ADDRESS
             valueTemplate: "auto"
+          # Keep the workspace's own accelerators visible after ray.init(). The local broker node the
+          # workspace attaches to was started num-gpus=0, so current Ray blanks CUDA_VISIBLE_DEVICES
+          # in the driver process on ray.init() — hiding a physical GPU from local (non-Ray) notebook
+          # code (torch.cuda.is_available() flips to False). Setting this to "0" adopts Ray's future
+          # no-override behavior now. No-op on CPU-only workspaces; required for GPU workspaces.
+          - name: RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO
+            valueTemplate: "0"
           # Informational only (handy for debugging version-match issues). Safe to omit.
           - name: RAY_HEAD_IMAGE
             valueTemplate: '{{`{{ resource "rayCluster" "{.spec.headGroupSpec.template.spec.containers[0].image}" }}`}}'
