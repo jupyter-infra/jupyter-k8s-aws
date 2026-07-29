@@ -1,0 +1,126 @@
+{{- if .Values.rayIntegration.enabled }}
+# Ray Cluster Integration — WorkspaceIntegrationTemplate (admin-installed, chart-managed).
+# Design notes, version-match/GPU/object-store guidance, and per-field rationale live in
+# ./RAY_INTEGRATION.md (kept alongside this chart). Comments here are intentionally terse pointers.
+#
+# HELM ESCAPING: operator Go-template expressions are wrapped in Helm's backtick idiom so Helm
+# renders them verbatim; only .Values / .Release are Helm's. See README "Helm escaping".
+apiVersion: workspace.jupyter.org/v1alpha1
+kind: WorkspaceIntegrationTemplate
+metadata:
+  # PUBLIC CONTRACT — do not rename `ray-integration` or the `rayClusterName` parameter; the Studio
+  # Ray extension references both by name. See README "Studio dependency".
+  name: ray-integration
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: jupyter-k8s-aws-hyperpod
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  displayName: "Ray Cluster Integration"   # human-facing label shown in an integration picker UI
+
+  # Declared parameters the workspace fills in (webhook rejects undeclared refs / omitted params).
+  # See README "parameters".
+  parameters:
+    - name: rayClusterName        # which RayCluster to join (resolved in the workspace's own namespace)
+
+  # Workspace shares the sidecar's PID namespace to attach to its local Ray session. See README
+  # "shareProcessNamespace".
+  shareProcessNamespace: true
+
+  # Fetch the customer-named RayCluster at reconcile time to read live values (head image, head
+  # service name, GCS port); resolves in the workspace's own namespace. See README "resourceRefs".
+  resourceRefs:
+    - name: rayCluster                    # handle used in template expressions below
+      apiVersion: ray.io/v1               # KubeRay RayCluster API group/version
+      kind: RayCluster
+      metadata:
+        name: "{{`{{ .Parameters.rayClusterName }}`}}"        # customer-supplied on the workspace
+
+  # Report-only health check (operator execs `ray status`; never gates the pod). See README
+  # "statusProbe".
+  statusProbe:
+    exec:
+      command: ["ray", "status"]
+
+  deploymentModifications:
+    podModifications:
+      additionalContainers:
+        - name: ray-sidecar
+          # Image resolved from the RayCluster head so the sidecar's Ray binary matches the cluster.
+          image: '{{`{{ resource "rayCluster" "{.spec.headGroupSpec.template.spec.containers[0].image}" }}`}}'
+          # /bin/sh (not bash): sidecar inherits the customer's head image; slim images lack bash.
+          command: ["/bin/sh", "-c"]
+          args:
+            # Join the RayCluster as a zero-resource client node (address/port read from RayCluster
+            # .status; --num-cpus/gpus=0 so no compute lands here; --object-store-memory pinned;
+            # --temp-dir shared; --block for auto-reconnect). Retry loop guards transient early-attach
+            # failures, bounded at 30 attempts. See README "The ray-sidecar container".
+            - |-
+              n=0
+              until ray start \
+                --address={{`{{ resource "rayCluster" "{.status.head.serviceName}" }}`}}.{{`{{ .Workspace.Namespace }}`}}.svc.cluster.local:{{`{{ resource "rayCluster" "{.status.endpoints.gcs-server}" }}`}} \
+                --num-cpus=0 \
+                --num-gpus=0 \
+                --object-store-memory={{ .Values.rayIntegration.objectStoreMemory }} \
+                --temp-dir=/tmp/ray \
+                --block; do
+                n=$((n+1))
+                if [ "$n" -ge 30 ]; then
+                  echo "ray start did not succeed after $n attempts; giving up so the failure is visible" >&2
+                  exit 1
+                fi
+                echo "ray start failed (attempt $n) - the RayCluster head may not be reachable yet; retrying in 10s" >&2
+                sleep 10
+              done
+          # Non-zero requests; memory limit must cover objectStoreMemory + raylet + /tmp/ray (coupled
+          # values — see README "Object store / shared memory sizing").
+          resources:
+            {{- toYaml .Values.rayIntegration.sidecar.resources | nindent 12 }}
+          securityContext:
+            # uid/gid must match the workspace image to share /tmp/ray (override in values.yaml for a
+            # custom uid). See README "securityContext".
+            runAsUser: {{ .Values.rayIntegration.sidecar.runAsUser }}
+            runAsGroup: {{ .Values.rayIntegration.sidecar.runAsGroup }}
+            runAsNonRoot: true              # defense-in-depth: never run as root
+            allowPrivilegeEscalation: false # defense-in-depth
+            capabilities:
+              drop: ["ALL"]                 # sidecar needs no Linux capabilities
+          # No readinessProbe by design — Ray health is reported via statusProbe, not pod-gated.
+          # See README "No readinessProbe".
+          volumeMounts:
+            - name: ray-tmp
+              mountPath: /tmp/ray
+            - name: ray-dshm            # tmpfs /dev/shm for the plasma object store (see README "Volumes")
+              mountPath: /dev/shm
+      volumes:
+        - name: ray-tmp                 # shared tmpfs session dir (see README "Volumes")
+          emptyDir:
+            medium: Memory
+            sizeLimit: 256Mi
+        - name: ray-dshm                # /dev/shm sized to objectStoreMemory (see README "Volumes")
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.rayIntegration.devShmSizeLimit }}
+      primaryContainerModifications:
+        # Mount the same session dir + enlarged /dev/shm into the workspace (see README
+        # "Workspace container modifications").
+        volumeMounts:
+          - name: ray-tmp
+            mountPath: /tmp/ray
+          - name: ray-dshm
+            mountPath: /dev/shm
+        mergeEnv:
+          # RAY_ADDRESS=auto: ray.init() attaches to the sidecar's local session. See README.
+          - name: RAY_ADDRESS
+            valueTemplate: "auto"
+          # Keep the workspace's own GPU visible after ray.init() (broker node is num-gpus=0).
+          # See README "GPU workspaces".
+          - name: RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO
+            valueTemplate: "0"
+          # Informational only (debugging version-match). Safe to omit.
+          - name: RAY_HEAD_IMAGE
+            valueTemplate: '{{`{{ resource "rayCluster" "{.spec.headGroupSpec.template.spec.containers[0].image}" }}`}}'
+          - name: RAY_CLUSTER_NAME
+            valueTemplate: "{{`{{ .Parameters.rayClusterName }}`}}"
+{{- end }}
