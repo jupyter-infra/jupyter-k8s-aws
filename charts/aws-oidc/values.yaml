@@ -67,7 +67,7 @@ traefik:
   # Traefik deployment image name
   imageName: traefik
   # Traefik deployment image tag
-  imageTag: v3.7.7
+  imageTag: v3.7.9
   # Number of traefik replicas (used when keda.enabled is false)
   replicas: 2
   # KEDA ScaledObject configuration — scales Traefik based on open connections.
@@ -261,7 +261,7 @@ webApp:
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-ui
-  imageTag: v0.1.3
+  imageTag: v0.1.4
   # Kubernetes namespace where workspaces are created and managed
   namespace: default
   resources:
@@ -330,7 +330,7 @@ authmiddleware:
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-authmiddleware
-  imageTag: v0.2.0
+  imageTag: v0.2.1
   # Resource limits and requests
   resources:
     limits:
@@ -382,7 +382,7 @@ rotator:
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-rotator
-  imageTag: v0.2.0
+  imageTag: v0.2.1
   # Rotation interval (how often to rotate keys)
   # Must be parseable as a duration (e.g., "15m", "1h")
   rotationInterval: "15m"
