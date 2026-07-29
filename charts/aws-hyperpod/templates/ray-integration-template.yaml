@@ -1,56 +1,15 @@
 {{- if .Values.rayIntegration.enabled }}
+# Ray Cluster Integration — WorkspaceIntegrationTemplate (admin-installed, chart-managed).
+# Design notes, version-match/GPU/object-store guidance, and per-field rationale live in
+# ./RAY_INTEGRATION.md (kept alongside this chart). Comments here are intentionally terse pointers.
 #
-# Ray Cluster Integration — WorkspaceIntegrationTemplate (admin-installed, chart-managed)
-#
-# An admin installs this once per cluster; each customer only supplies the RayCluster name via their
-# Workspace's integrationTemplateRefs[].parameters. The RayCluster must be in the workspace's own
-# namespace. It injects a "ray-sidecar" that joins the RayCluster as a zero-resource client node,
-# plus the env/volumes the workspace's Ray client needs to attach.
-#
-# HELM ESCAPING: the operator's own Go-template expressions are wrapped in Helm's backtick idiom so
-# Helm renders them through verbatim. Helm evaluates this whole file first (comments included), so
-# only the chart-level .Values / .Release references are Helm's; everything else is the operator's.
-#
-# VERSION MATCHING (customer responsibility): Ray requires the client (workspace) and cluster to
-# match on Ray version AND Python version to the patch level. The sidecar image is resolved from the
-# RayCluster head image, so the cluster head image must match the workspace image's Ray/Python.
-# public.ecr.aws/sagemaker/sagemaker-distribution ships both JupyterLab and a matching Ray; the
-# simplest guarantee is to run the RayCluster head on the same Ray/Python as the workspace image.
-# Last tested against Ray 2.55.0 / Python 3.11.
-#   On a mismatch there is no admission error — ray.init() fails at runtime in the workspace with a
-#   version-mismatch message (e.g. "Version mismatch: The cluster was started with Ray <x> / Python
-#   <y>, this process is Ray <a> / Python <b>"). The workspace pod stays healthy (the statusProbe is
-#   report-only); only the Ray attach fails. Fix by aligning the RayCluster head image with the
-#   workspace image.
-#   GPU workspaces: the same match discipline extends to CUDA — when tensors move between a GPU
-#   workspace and GPU RayCluster workers, the workspace image and the worker image must be
-#   CUDA/driver compatible, not just Ray/Python compatible.
-#
-# GPU WORKSPACES: this integration is a connection broker — Ray compute runs on the RayCluster's
-# worker pods, never on the workspace pod (the sidecar joins num-cpus=0/num-gpus=0). A GPU on the
-# workspace pod is therefore for LOCAL notebook use only; steer Ray GPU work to GPU RayCluster
-# workers via @ray.remote(num_gpus=...). One required fix for GPU workspaces is handled below: the
-# RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO env keeps the workspace's own GPU visible after ray.init()
-# (see the mergeEnv block).
-#
-# OBJECT STORE / SHARED MEMORY SIZING: Ray's object store (plasma) lives in /dev/shm. Containers
-# default /dev/shm to 64MB, so without intervention Ray spills to /tmp (slow) and warns. In a
-# container Ray's auto-sizing is non-deterministic (it may read the cgroup limit OR the whole node's
-# RAM), so we PIN the object store explicitly and keep three values coupled and consistent:
-#     --object-store-memory  ==  /dev/shm emptyDir sizeLimit  <=  sidecar memory limit (minus overhead)
-# Defaults below use a modest 1Gi object store appropriate for a connection broker. Raise all three
-# together for workloads that pull large Ray Data results back into the workspace — GPU notebooks
-# that pull large tensors/Ray Data blocks back into the driver typically want 4-8Gi (set
-# rayIntegration.objectStoreMemory + devShmSizeLimit + sidecar.resources.limits.memory together).
-#
+# HELM ESCAPING: operator Go-template expressions are wrapped in Helm's backtick idiom so Helm
+# renders them verbatim; only .Values / .Release are Helm's. See README "Helm escaping".
 apiVersion: workspace.jupyter.org/v1alpha1
 kind: WorkspaceIntegrationTemplate
 metadata:
-  # NAME IS A PUBLIC CONTRACT — do not rename. The SageMaker Studio Ray extension references this
-  # WorkspaceIntegrationTemplate by the literal name "ray-integration" when it wires a workspace's
-  # integrationTemplateRefs[]. The declared parameter below (rayClusterName) is likewise part of that
-  # contract — the extension fills it by name. Renaming the template or the parameter silently breaks
-  # the Studio attach flow (the ref resolves to nothing), so treat both as a stable API.
+  # PUBLIC CONTRACT — do not rename `ray-integration` or the `rayClusterName` parameter; the Studio
+  # Ray extension references both by name. See README "Studio dependency".
   name: ray-integration
   namespace: {{ .Values.namespace }}
   labels:
@@ -60,26 +19,17 @@ metadata:
 spec:
   displayName: "Ray Cluster Integration"   # human-facing label shown in an integration picker UI
 
-  # parameters declares the contract the workspace fills in. Every {{`{{ .Parameters.X }}`}} this
-  # template references MUST be declared here: the validating webhook rejects a template that
-  # references an undeclared parameter (author typo) and rejects a referencing workspace that omits a
-  # declared one. Both values below are customer-supplied on the Workspace's
-  # integrationTemplateRefs[].parameters.
+  # Declared parameters the workspace fills in (webhook rejects undeclared refs / omitted params).
+  # See README "parameters".
   parameters:
     - name: rayClusterName        # which RayCluster to join (resolved in the workspace's own namespace)
 
-  # shareProcessNamespace: the workspace container must see the Ray process that runs in the
-  # ray-sidecar (the workspace attaches to the local Ray session the sidecar starts). A shared PID
-  # namespace makes the sidecar's processes visible to — and signalable by — the workspace container.
-  # Both run as uid 1000 (see the sidecar securityContext), so the cross-container signal/attach
-  # works without granting root.
+  # Workspace shares the sidecar's PID namespace to attach to its local Ray session. See README
+  # "shareProcessNamespace".
   shareProcessNamespace: true
 
-  # resourceRefs: fetch the customer-named RayCluster at reconcile time so we can read live values
-  # from it (head image, head service name, GCS port). metadata.name supports templates.
-  # Each entry has a `name` handle, referenced below as {{`{{ resource "<name>" "<jsonpath>" }}`}}.
-  # The RayCluster always resolves in the workspace's own namespace; cross-namespace references are
-  # not supported.
+  # Fetch the customer-named RayCluster at reconcile time to read live values (head image, head
+  # service name, GCS port); resolves in the workspace's own namespace. See README "resourceRefs".
   resourceRefs:
     - name: rayCluster                    # handle used in template expressions below
       apiVersion: ray.io/v1               # KubeRay RayCluster API group/version
@@ -87,12 +37,8 @@ spec:
       metadata:
         name: "{{`{{ .Parameters.rayClusterName }}`}}"        # customer-supplied on the workspace
 
-  # statusProbe: the operator periodically execs this command in the workspace container and records
-  # the verdict in workspace.status.integrationStatuses[]. It is report-only (named statusProbe, not
-  # readinessProbe, because it never gates the pod or restarts it) — it surfaces integration health
-  # only. `ray status` exits 0 only when the local Ray session can reach the cluster's GCS, so it
-  # catches data-plane failures (e.g. a GCS reconnect loop) that a control-plane RayCluster .status
-  # check would miss.
+  # Report-only health check (operator execs `ray status`; never gates the pod). See README
+  # "statusProbe".
   statusProbe:
     exec:
       command: ["ray", "status"]
@@ -101,44 +47,15 @@ spec:
     podModifications:
       additionalContainers:
         - name: ray-sidecar
-          # Image resolved from the RayCluster head container, guaranteeing the sidecar's Ray binary
-          # matches the cluster it joins. (Workspace<->cluster version match is still the customer's
-          # responsibility — see header.)
+          # Image resolved from the RayCluster head so the sidecar's Ray binary matches the cluster.
           image: '{{`{{ resource "rayCluster" "{.spec.headGroupSpec.template.spec.containers[0].image}" }}`}}'
-          # Use /bin/sh (not /bin/bash): the sidecar inherits the customer's RayCluster head image,
-          # which we do not control. Slim/distroless Ray images (e.g. rayproject/ray:*-slim) ship
-          # without /bin/bash and would CrashLoopBackOff on "/bin/bash: not found". /bin/sh is present
-          # on effectively all images, and the args below use no bash-specific syntax.
+          # /bin/sh (not bash): sidecar inherits the customer's head image; slim images lack bash.
           command: ["/bin/sh", "-c"]
           args:
-            # Join the RayCluster as a zero-resource client node.
-            #   --address=<head-svc>.<ns>.svc.cluster.local:<gcs-port>
-            #        Head service DNS name and GCS port are read from RayCluster .status, which
-            #        KubeRay owns and keeps correct even if naming/port conventions change. The
-            #        service DNS (not the pod IP) is stable across head restarts, enabling
-            #        auto-reconnect.
-            #   --num-cpus=0 --num-gpus=0  the sidecar contributes NO compute and advertises no GPUs,
-            #        so the Ray scheduler never places tasks/actors on the workspace pod. It exists
-            #        only to host the local Ray session the workspace attaches to.
-            #   --object-store-memory  EXPLICITLY pin the plasma object store to 1Gi. We do NOT let
-            #        Ray auto-size it: inside a container Ray may read either the cgroup limit OR the
-            #        whole node's RAM (non-deterministic), and if it reads node RAM it sizes the store
-            #        far larger than the sidecar's limit and OOM-kills it. Pinning makes the footprint
-            #        deterministic. This 1Gi must stay coupled to two other values: the /dev/shm
-            #        sizeLimit (>= this, or Ray fails to start) and the sidecar memory limit
-            #        (>= this + raylet/temp overhead). Raise all three together for heavier data pulls.
-            #   --temp-dir=/tmp/ray  explicit shared session dir (see ray-tmp volume); the workspace
-            #        attaches via this dir, so it must be deterministic.
-            #   --block  keep ray in the foreground so the container stays alive; on exit k8s restarts
-            #        it and it re-resolves the head DNS (this is how head-restart auto-recovery works).
-            #
-            # RETRY LOOP: `ray start` can fail transiently — most commonly when the sidecar starts
-            # before the RayCluster head's GCS is reachable (early attach). Rather than exit and lean
-            # on the kubelet's CrashLoopBackOff (which escalates the restart delay up to ~5m and reads
-            # as a crashing container), we retry in-container on a fixed 10s cadence. --block means a
-            # successful start never returns, so the loop body only runs on failure. Bounded at 30
-            # attempts (~5m) so a genuinely bad reference (wrong cluster name, permanent misconfig)
-            # eventually exits with a clear message instead of spinning forever.
+            # Join the RayCluster as a zero-resource client node (address/port read from RayCluster
+            # .status; --num-cpus/gpus=0 so no compute lands here; --object-store-memory pinned;
+            # --temp-dir shared; --block for auto-reconnect). Retry loop guards transient early-attach
+            # failures, bounded at 30 attempts. See README "The ray-sidecar container".
             - |-
               n=0
               until ray start \
@@ -156,82 +73,52 @@ spec:
                 echo "ray start failed (attempt $n) - the RayCluster head may not be reachable yet; retrying in 10s" >&2
                 sleep 10
               done
+          # Non-zero requests; memory limit must cover objectStoreMemory + raylet + /tmp/ray (coupled
+          # values — see README "Object store / shared memory sizing").
           resources:
-            # NON-ZERO requests (a 0 request makes the sidecar first to be evicted and gives the
-            # scheduler no signal). The memory limit must be >= objectStoreMemory + raylet overhead
-            # (~256Mi) + the /tmp/ray tmpfs. These three are coupled: objectStoreMemory <= /dev/shm
-            # sizeLimit <= covered by this memory limit. Raise all three together (in values.yaml)
-            # for heavier Ray Data result-pulling.
             {{- toYaml .Values.rayIntegration.sidecar.resources | nindent 12 }}
           securityContext:
-            # runAsUser/Group must match the workspace image's uid so both containers share the
-            # /tmp/ray session dir. sagemaker-distribution (sagemaker-user) and rayproject/ray (ray)
-            # both use uid 1000, so the defaults work today — but it is image coupling. If a custom
-            # workspace image runs as a different uid, override rayIntegration.sidecar.runAsUser/
-            # runAsGroup in values.yaml or the workspace cannot read the sidecar's session files and
-            # ray.init() fails.
+            # uid/gid must match the workspace image to share /tmp/ray (override in values.yaml for a
+            # custom uid). See README "securityContext".
             runAsUser: {{ .Values.rayIntegration.sidecar.runAsUser }}
             runAsGroup: {{ .Values.rayIntegration.sidecar.runAsGroup }}
             runAsNonRoot: true              # defense-in-depth: never run as root
             allowPrivilegeEscalation: false # defense-in-depth
             capabilities:
               drop: ["ALL"]                 # sidecar needs no Linux capabilities
-          # NOTE: the sidecar deliberately has NO readinessProbe. Ray connectivity is reported by the
-          # statusProbe above (operator-run, report-only, surfaced in workspace.status.integrationStatuses[]).
-          # A container readinessProbe here would instead GATE pod readiness on Ray-cluster health -- a
-          # RayCluster outage would flip the pod NotReady and drop the Workspace to Available=False
-          # even though JupyterLab itself is fine. The sidecar exposes no service ports, so readiness
-          # gating buys nothing; keep Ray health non-gating and let statusProbe be the single source
-          # of integration health.
+          # No readinessProbe by design — Ray health is reported via statusProbe, not pod-gated.
+          # See README "No readinessProbe".
           volumeMounts:
             - name: ray-tmp
               mountPath: /tmp/ray
-            # Real shared-memory mount: container /dev/shm defaults to 64MB, which is too small for
-            # Ray's plasma object store and triggers the "object store using /tmp instead of /dev/shm"
-            # warning + degraded performance. Mount a tmpfs at /dev/shm sized to the object store
-            # (1Gi). NOTE: /dev/shm sizeLimit must be >= --object-store-memory or Ray fails to start
-            # with "object store size exceeds the capacity of /dev/shm".
-            - name: ray-dshm
+            - name: ray-dshm            # tmpfs /dev/shm for the plasma object store (see README "Volumes")
               mountPath: /dev/shm
       volumes:
-        - name: ray-tmp
-          # tmpfs shared session dir (Ray session/temp IO is latency-sensitive). Shared between the
-          # sidecar and the workspace container so the workspace's ray.init() discovers the sidecar's
-          # local Ray session. Cap bounds the tmpfs against the pod memory limit.
+        - name: ray-tmp                 # shared tmpfs session dir (see README "Volumes")
           emptyDir:
             medium: Memory
             sizeLimit: 256Mi
-        - name: ray-dshm
-          # tmpfs /dev/shm sized to match objectStoreMemory. medium: Memory means this counts against
-          # container memory, which is why the sidecar memory limit is sized to cover it plus the
-          # raylet. Keep devShmSizeLimit >= objectStoreMemory; raise both together (in values.yaml).
+        - name: ray-dshm                # /dev/shm sized to objectStoreMemory (see README "Volumes")
           emptyDir:
             medium: Memory
             sizeLimit: {{ .Values.rayIntegration.devShmSizeLimit }}
       primaryContainerModifications:
+        # Mount the same session dir + enlarged /dev/shm into the workspace (see README
+        # "Workspace container modifications").
         volumeMounts:
-          # Mount the SAME session dir into the workspace container so ray.init() (RAY_ADDRESS=auto)
-          # finds the local session the sidecar created.
           - name: ray-tmp
             mountPath: /tmp/ray
-          # The workspace client also materializes Ray Data blocks locally when results are pulled
-          # back into the notebook, so it needs the same enlarged /dev/shm, not the 64MB default.
           - name: ray-dshm
             mountPath: /dev/shm
         mergeEnv:
-          # RAY_ADDRESS=auto: ray.init() with no arguments attaches to the local session in /tmp/ray
-          # (created by the sidecar) instead of bootstrapping a new cluster. This is the single most
-          # important env var — it is what makes ray.init() succeed from the workspace.
+          # RAY_ADDRESS=auto: ray.init() attaches to the sidecar's local session. See README.
           - name: RAY_ADDRESS
             valueTemplate: "auto"
-          # Keep the workspace's own accelerators visible after ray.init(). The local broker node the
-          # workspace attaches to was started num-gpus=0, so current Ray blanks CUDA_VISIBLE_DEVICES
-          # in the driver process on ray.init() — hiding a physical GPU from local (non-Ray) notebook
-          # code (torch.cuda.is_available() flips to False). Setting this to "0" adopts Ray's future
-          # no-override behavior now. No-op on CPU-only workspaces; required for GPU workspaces.
+          # Keep the workspace's own GPU visible after ray.init() (broker node is num-gpus=0).
+          # See README "GPU workspaces".
           - name: RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO
             valueTemplate: "0"
-          # Informational only (handy for debugging version-match issues). Safe to omit.
+          # Informational only (debugging version-match). Safe to omit.
           - name: RAY_HEAD_IMAGE
             valueTemplate: '{{`{{ resource "rayCluster" "{.spec.headGroupSpec.template.spec.containers[0].image}" }}`}}'
           - name: RAY_CLUSTER_NAME
