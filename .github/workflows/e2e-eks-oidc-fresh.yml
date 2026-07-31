@@ -81,7 +81,11 @@ jobs:
 
   cleanup-existing:
     name: "Cleanup existing deployment"
-    if: ${{ !inputs.skip-deployment }}
+    # TEMPORARY: hardcoded off. find-takedown-eks has been failing on stale/dirty
+    # projects and blocking the v0.2.0 release. The target subdomain is currently
+    # clean (no existing cluster), so cleanup is a no-op we can skip. REVERT to
+    # `${{ !inputs.skip-deployment }}` once v0.2.0 is out.
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 90
     environment: e2e-fresh
@@ -132,7 +136,9 @@ jobs:
 
   deploy:
     name: "Deploy from scratch"
-    needs: [build-image, cleanup-existing]
+    # cleanup-existing is temporarily hardcoded off (see its comment); dropped from
+    # needs so deploy still runs. REVERT to [build-image, cleanup-existing] with it.
+    needs: [build-image]
     if: ${{ !inputs.skip-deployment }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -235,7 +241,8 @@ jobs:
 
   deploy-gate:
     name: "Deploy gate"
-    needs: [build-image, cleanup-existing, deploy]
+    # cleanup-existing temporarily removed from needs (hardcoded off). REVERT with it.
+    needs: [build-image, deploy]
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     timeout-minutes: 1

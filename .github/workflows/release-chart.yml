@@ -115,7 +115,12 @@ jobs:
     if: always() && needs.helm-lint.result == 'success' && needs.helm-test.result == 'success' && inputs.chart == 'aws-oidc' && inputs.dry_run == false
     uses: ./.github/workflows/e2e-eks-oidc-fresh.yml
     with:
-      destroy-after: true
+      # TEMPORARY (revert with cleanup-existing): keep the cluster after the release
+      # E2E, pass or fail, so a flaky-test failure can be investigated / retried
+      # against the surviving cluster instead of paying for a full fresh redeploy
+      # and a new Let's Encrypt cert. Paired with cleanup-existing being skipped,
+      # the release runs no destructive teardown until v0.2.0 is out.
+      destroy-after: false
       oauth-app-num: ${{ inputs.oauth_app_num }}
     permissions:
       id-token: write
