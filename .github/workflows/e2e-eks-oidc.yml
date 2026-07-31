@@ -62,7 +62,7 @@ jobs:
         run: |
           helm upgrade jupyter-k8s-aws-oidc charts/aws-oidc \
             -n jupyter-k8s-router \
-            --reuse-values \
+            --reset-then-reuse-values \
             --wait --timeout 5m
 
       - name: Verify deployments healthy

@@ -190,7 +190,7 @@ jobs:
           aws eks update-kubeconfig --name "$CLUSTER" --region ${{ vars.AWS_REGION }}
           helm upgrade jupyter-k8s-aws-oidc charts/aws-oidc \
             -n jupyter-k8s-router \
-            --reuse-values \
+            --reset-then-reuse-values \
             --wait --timeout 5m
 
       - name: Refresh auth state (full GitHub login)

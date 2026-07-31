@@ -10,6 +10,8 @@ required_sensitive:
 overrides:
   admin_role_names: ${JD_E2E_VAR_ADMIN_ROLE_NAMES}
   cluster_log_retention_days: 7
-  workspace_operator_chart_version: "0.1.2"
-  workspace_router_chart_version: "0.1.0"
+  # Chart versions are intentionally NOT overridden here: CI must test whatever
+  # the eks-oidc template preset pins. Hardcoding them caused a stale operator
+  # (0.1.2) to be deployed after the preset moved to 0.2.0, silently breaking
+  # workspace tests via the old operator's default-template webhook.
   workspaces_idle_shutdown_timeout_min: 1
