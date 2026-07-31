@@ -26,8 +26,8 @@ on:
       oauth-app-num:
         description: "OAuth app number (1–3). Fresh deploys consume a LE cert (limit: 5/subdomain/week). Default 3 (fresh); use 2 (canary) if slot 3 is exhausted."
         required: false
-        type: number
-        default: 3
+        type: string
+        default: "3"
   workflow_dispatch:
     inputs:
       test-filter:
@@ -53,8 +53,8 @@ on:
       oauth-app-num:
         description: "OAuth app number (1–3). Fresh deploys consume a LE cert (limit: 5/subdomain/week). Default 3 (fresh); use 2 (canary) if slot 3 is exhausted."
         required: false
-        type: number
-        default: 3
+        type: string
+        default: "3"
 
 permissions:
   id-token: write

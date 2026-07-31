@@ -33,10 +33,10 @@ on:
         required: true
         type: string
       oauth-app-num:
-        description: "OAuth app slot number (1-6)"
+        description: "OAuth app number (1–3)"
         required: false
-        type: number
-        default: 3
+        type: string
+        default: "3"
 
 jobs:
   test:
