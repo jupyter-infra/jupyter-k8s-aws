@@ -23,6 +23,11 @@ on:
         required: false
         type: string
         default: ""
+      oauth-app-num:
+        description: "OAuth app number (1–3). Fresh deploys consume a LE cert (limit: 5/subdomain/week). Default 3 (fresh); use 2 (canary) if slot 3 is exhausted."
+        required: false
+        type: number
+        default: 3
   workflow_dispatch:
     inputs:
       test-filter:
@@ -45,6 +50,11 @@ on:
         required: false
         type: string
         default: ""
+      oauth-app-num:
+        description: "OAuth app number (1–3). Fresh deploys consume a LE cert (limit: 5/subdomain/week). Default 3 (fresh); use 2 (canary) if slot 3 is exhausted."
+        required: false
+        type: number
+        default: 3
 
 permissions:
   id-token: write
@@ -62,6 +72,7 @@ jobs:
     uses: ./.github/workflows/e2e-build-image.yml
     with:
       ref: ${{ inputs.ref }}
+      oauth-app-num: ${{ inputs.oauth-app-num }}
     permissions:
       id-token: write
       contents: read
@@ -115,7 +126,7 @@ jobs:
         run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci
 
       - name: Find and take down previous deployment
-        run: JD_DIR=jupyter-deploy just find-takedown-eks 4 sandbox-ci sandbox-e2e
+        run: JD_DIR=jupyter-deploy just find-takedown-eks ${{ inputs.oauth-app-num }} sandbox-ci sandbox-e2e
 
   # --- Deploy ---
 
@@ -170,14 +181,14 @@ jobs:
 
       - name: Generate .env
         run: >-
-          JD_DIR=jupyter-deploy just env-setup-eks "" sandbox-ci 4
+          JD_DIR=jupyter-deploy just env-setup-eks "" sandbox-ci ${{ inputs.oauth-app-num }}
           "org=jupyter-infra,team=jupyter-k8s-aws-e2e-app-access,rbac-team=jupyter-k8s-aws-e2e-app-access,admin-roles=[\"Admin\",\"DeployRole\",\"jupyter-k8s-aws-ci-e2e-52ed8fab\"]"
 
       - name: Import auth state
         run: JD_DIR=jupyter-deploy just auth-import sandbox-ci
 
       - name: Pull pre-built E2E image
-        run: JD_DIR=jupyter-deploy just ci-e2e-pull 4 ${{ needs.build-image.outputs.ecr-tag }} sandbox-ci
+        run: JD_DIR=jupyter-deploy just ci-e2e-pull ${{ inputs.oauth-app-num }} ${{ needs.build-image.outputs.ecr-tag }} sandbox-ci
 
       - name: Deploy (jd init / config / up)
         id: deploy
@@ -218,7 +229,7 @@ jobs:
       - name: Upload test results to S3
         if: failure()
         continue-on-error: true
-        run: JD_DIR=jupyter-deploy just ci-upload-test-results 4 sandbox-ci
+        run: JD_DIR=jupyter-deploy just ci-upload-test-results ${{ inputs.oauth-app-num }} sandbox-ci
 
   # --- Gate ---
 
@@ -250,7 +261,7 @@ jobs:
       test-filter: ${{ inputs.test-filter }}
       ref: ${{ inputs.ref }}
       ecr-tag: ${{ needs.build-image.outputs.ecr-tag }}
-      oauth-app-num: 4
+      oauth-app-num: ${{ inputs.oauth-app-num }}
       timeout-minutes: 120
     permissions:
       id-token: write
@@ -264,7 +275,7 @@ jobs:
       test-filter: ${{ inputs.test-filter }}
       ref: ${{ inputs.ref }}
       ecr-tag: ${{ needs.build-image.outputs.ecr-tag }}
-      oauth-app-num: 4
+      oauth-app-num: ${{ inputs.oauth-app-num }}
       marker: mutating
       mutate: true
       timeout-minutes: 60
@@ -325,7 +336,7 @@ jobs:
 
       - name: Restore EKS project
         id: restore-eks
-        run: JD_DIR=jupyter-deploy just ci-restore-eks 4 sandbox-ci sandbox-e2e
+        run: JD_DIR=jupyter-deploy just ci-restore-eks ${{ inputs.oauth-app-num }} sandbox-ci sandbox-e2e
         continue-on-error: true
 
       - name: Destroy cluster

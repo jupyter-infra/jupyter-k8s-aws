@@ -17,6 +17,15 @@ on:
         description: 'Push to staging only, skip promotion and release'
         type: boolean
         default: false
+      oauth_app_num:
+        description: 'OAuth app number. Fresh deploys consume a LE cert (limit: 5/subdomain/week). Default 3 (fresh); use 2 (canary) if slot 3 is exhausted.'
+        required: false
+        type: choice
+        default: '3'
+        options:
+          - '3'
+          - '2'
+          - '1'
 
 jobs:
   validate:
@@ -107,6 +116,7 @@ jobs:
     uses: ./.github/workflows/e2e-eks-oidc-fresh.yml
     with:
       destroy-after: true
+      oauth-app-num: ${{ inputs.oauth_app_num }}
     permissions:
       id-token: write
       contents: read
