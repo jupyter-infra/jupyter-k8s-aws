@@ -62,12 +62,12 @@ jobs:
         run: JD_DIR=jupyter-deploy just ci-restore sandbox-ci
 
       - name: Pull previous image for cache
-        run: JD_DIR=jupyter-deploy just ci-e2e-pull 3 latest sandbox-ci || true
+        run: JD_DIR=jupyter-deploy just ci-e2e-pull 4 latest sandbox-ci || true
 
       - name: Build E2E image
         run: |
-          ECR_URL=$(JD_DIR=jupyter-deploy just ci-e2e-ecr-url 3 sandbox-ci)
+          ECR_URL=$(JD_DIR=jupyter-deploy just ci-e2e-ecr-url 4 sandbox-ci)
           JD_DIR=jupyter-deploy just ci-e2e-build "$ECR_URL:latest"
 
       - name: Push to ECR
-        run: JD_DIR=jupyter-deploy just ci-e2e-push 3 ${{ github.sha }} sandbox-ci
+        run: JD_DIR=jupyter-deploy just ci-e2e-push 4 ${{ github.sha }} sandbox-ci

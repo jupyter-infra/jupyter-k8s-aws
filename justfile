@@ -1,8 +1,9 @@
 # OAuth app slot numbers
-# 1 = pr, 2 = canary, 3 = fresh
+# 1 = pr, 2 = canary, 4 = fresh
+# (slot 3's Let's Encrypt duplicate-cert quota was exhausted; moved fresh to slot 4)
 ci_dir := "sandbox-ci"
 e2e_dir := "sandbox-e2e"
-fresh_app_num := "3"
+fresh_app_num := "4"
 
 # Path to jupyter-deploy repo (override with JD_DIR env var)
 jd_dir := env_var_or_default("JD_DIR", "../jupyter-deploy")
