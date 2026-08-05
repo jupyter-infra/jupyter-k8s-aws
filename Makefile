@@ -29,6 +29,10 @@ CHARTS_DIR        := charts
 CHART_HYPERPOD    := $(CHARTS_DIR)/aws-hyperpod
 CHART_OIDC        := $(CHARTS_DIR)/aws-oidc
 
+# Published OCI location of the aws-oidc chart (source of truth for the
+# downgrade guard in check-aws-oidc-version).
+CHART_OIDC_OCI    := oci://ghcr.io/jupyter-infra/charts/jupyter-k8s-aws-oidc
+
 # Path to sibling jupyter-k8s checkout (for controller chart deployment)
 CONTROLLER_DIR ?= ../jupyter-k8s
 
@@ -117,6 +121,24 @@ deps: ## Download and tidy Go dependencies
 	go mod tidy
 
 ##@ Helm
+
+.PHONY: check-aws-oidc-version
+check-aws-oidc-version: ## Fail if local aws-oidc chart version is below the latest published OCI chart (downgrade guard)
+	@LOCAL=$$(awk '/^version:/{print $$2; exit}' $(CHART_OIDC)/Chart.yaml); \
+	echo "Local aws-oidc chart version: $$LOCAL"; \
+	PUBLISHED=$$(helm show chart $(CHART_OIDC_OCI) 2>/dev/null | awk '/^version:/{print $$2}' || true); \
+	if [ -z "$$PUBLISHED" ]; then \
+		echo "WARNING: could not fetch published version from $(CHART_OIDC_OCI) (offline or registry error) — skipping downgrade check"; \
+		exit 0; \
+	fi; \
+	echo "Published aws-oidc chart version: $$PUBLISHED"; \
+	LOWEST=$$(printf '%s\n%s\n' "$$LOCAL" "$$PUBLISHED" | sort -V | head -n1); \
+	if [ "$$LOCAL" != "$$PUBLISHED" ] && [ "$$LOWEST" = "$$LOCAL" ]; then \
+		echo "ERROR: local chart version $$LOCAL is BELOW the published $$PUBLISHED."; \
+		echo "A 'helm upgrade' with this chart would be a downgrade. Bump $(CHART_OIDC)/Chart.yaml."; \
+		exit 1; \
+	fi; \
+	echo "OK: local version $$LOCAL >= published $$PUBLISHED"
 
 .PHONY: helm-lint
 helm-lint: ## Lint all Helm charts
@@ -259,7 +281,7 @@ kubectl-aws: ## Configure kubectl to use remote cluster
 	fi
 
 .PHONY: deploy-aws-oidc
-deploy-aws-oidc: setup-aws ## Deploy aws-oidc chart (reuses existing Helm values from JD)
+deploy-aws-oidc: check-aws-oidc-version setup-aws ## Deploy aws-oidc chart (reuses existing Helm values from JD)
 	@echo "Upgrading aws-oidc chart with --reset-then-reuse-values..."
 	helm upgrade jupyter-k8s-aws-oidc $(CHART_OIDC) \
 		-n jupyter-k8s-router \

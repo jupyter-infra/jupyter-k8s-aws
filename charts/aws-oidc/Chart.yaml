@@ -2,8 +2,8 @@ apiVersion: v2
 name: jupyter-k8s-aws-oidc
 description: AWS OIDC extension for jupyter-k8s (Traefik + Dex + OAuth2-Proxy)
 type: application
-version: 0.1.1
-appVersion: "0.1.1"
+version: 0.2.1
+appVersion: "0.2.1"
 icon: "https://example.com/icon.png"
 
 # Dependencies
