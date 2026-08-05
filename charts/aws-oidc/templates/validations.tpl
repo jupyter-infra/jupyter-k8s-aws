@@ -43,10 +43,16 @@
 {{- fail (printf "webApp.workspaceNamespaceSelection.additionalNamespaces must not contain the default workspace namespace %q — it is always included automatically" .Values.webApp.workspacesDefaultNamespace) }}
 {{- end }}
 
-{{/* Validate: additionalNamespaces must not contain duplicates */}}
-{{- $additional := .Values.webApp.workspaceNamespaceSelection.additionalNamespaces }}
+{{/* Validate: additionalNamespaces must not contain duplicates (| default list tolerates a null override) */}}
+{{- $additional := .Values.webApp.workspaceNamespaceSelection.additionalNamespaces | default list }}
 {{- if ne (len $additional) (len (uniq $additional)) }}
 {{- fail (printf "webApp.workspaceNamespaceSelection.additionalNamespaces must not contain duplicates, got: %v" $additional) }}
+{{- end }}
+
+{{/* Validate: the pre-rename webApp.namespace key is no longer read (renamed to workspacesDefaultNamespace).
+     Guard explicitly — with --reset-then-reuse-values a stored old value would otherwise be silently dropped. */}}
+{{- if .Values.webApp.namespace }}
+{{- fail "webApp.namespace was renamed to webApp.workspacesDefaultNamespace — move the value to the new key" }}
 {{- end }}
 
 {{/* Validate JWT refresh settings */}}

@@ -521,5 +521,47 @@ var _ = Describe("Web App", func() {
 				ContainSubstring("duplicate"),
 				"Expected validation error mentioning duplicates")
 		})
+
+		It("should render when additionalNamespaces is explicitly null", func() {
+			// A values override resetting the default to null must not crash len().
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+
+			out, err := exec.Command("helm", "dependency", "build", chartDir).CombinedOutput()
+			Expect(err).NotTo(HaveOccurred(), "helm dependency build failed: %s", string(out))
+
+			args := append([]string{helmTemplateCmd, helmReleaseName, chartDir},
+				oidcRequiredArgs()...)
+			args = append(args,
+				helmSetFlag, "webApp.enabled=true",
+				helmSetFlag, "webApp.workspaceNamespaceSelection.additionalNamespaces=null",
+			)
+
+			out, err = exec.Command("helm", args...).CombinedOutput()
+			Expect(err).NotTo(HaveOccurred(), "helm template should tolerate a null additionalNamespaces: %s", string(out))
+		})
+	})
+
+	Context("validation: renamed webApp.namespace key", func() {
+		It("should fail when the pre-rename webApp.namespace is set", func() {
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+
+			out, err := exec.Command("helm", "dependency", "build", chartDir).CombinedOutput()
+			Expect(err).NotTo(HaveOccurred(), "helm dependency build failed: %s", string(out))
+
+			args := append([]string{helmTemplateCmd, helmReleaseName, chartDir},
+				oidcRequiredArgs()...)
+			args = append(args,
+				helmSetFlag, "webApp.enabled=true",
+				helmSetFlag, "webApp.namespace=my-ns",
+			)
+
+			out, err = exec.Command("helm", args...).CombinedOutput()
+			Expect(err).To(HaveOccurred(), "helm template should fail when the renamed webApp.namespace is set")
+			Expect(strings.ToLower(string(out))).To(
+				ContainSubstring("workspacesdefaultnamespace"),
+				"Expected the error to point at the new key name")
+		})
 	})
 })

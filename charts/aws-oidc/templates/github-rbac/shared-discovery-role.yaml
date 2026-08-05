@@ -1,5 +1,7 @@
-{{- if and .Values.githubRbac.create .Values.githubRbac.createOrgsRole }}
+{{- if and .Values.githubRbac.create .Values.githubRbac.createOrgsRole .Values.githubRbac.createSharedDiscoveryRole }}
 # Read-only discovery of shared WorkspaceTemplates and WorkspaceAccessStrategies.
+# Opt-in (githubRbac.createSharedDiscoveryRole): webApp.sharedNamespace must
+# already exist; this chart does not create it.
 # Grants end-users list/get with their OWN token so the web-app's editor and
 # template-select dropdowns can populate. Not required for a workspace to be
 # CREATED against a shared template — the operator resolves refs with its own SA.

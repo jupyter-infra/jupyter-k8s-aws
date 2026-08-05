@@ -180,6 +180,12 @@ githubRbac:
   namespace: default
   # whether to create organization/team-based role and role bindings
   createOrgsRole: true
+  # Whether to create the read-only shared-discovery Role/RoleBinding in
+  # webApp.sharedNamespace (lets end users list shared templates + access
+  # strategies for the editor dropdowns). Off by default: the chart does not
+  # create webApp.sharedNamespace, so enabling this requires that namespace to
+  # already exist.
+  createSharedDiscoveryRole: false
   # Falls back to github.orgs when unset (empty [] is treated as unset by Helm).
   # To disable RBAC subjects, set githubRbac.create: false — not an empty list.
   orgs: []
@@ -308,8 +314,10 @@ webApp:
   # Log verbosity: debug | info | warn | error. Mirrors jupyter-k8s-ui prod default.
   logLevel: "info"
   # Namespace-selector configuration for the multi-namespace workspace switcher.
-  # Defaults kept in sync with jupyter-k8s-ui server/k8s/config.ts — mirror any
-  # UI-default change here.
+  # Requires jupyter-k8s-ui >= v0.1.5 (namespace selector landed after v0.1.4):
+  # on older images these knobs are a no-op and the namespace-discovery
+  # ClusterRole stays dormant. Defaults kept in sync with jupyter-k8s-ui
+  # server/k8s/config.ts — mirror any UI-default change here.
   workspaceNamespaceSelection:
     # Extra workspace namespaces to expose in the switcher, IN ADDITION to
     # webApp.workspacesDefaultNamespace (which is always included). Use this to

@@ -117,13 +117,15 @@ var _ = Describe("GitHub RBAC", func() {
 	})
 
 	Context("shared-discovery Role (bare-install parity)", func() {
-		// renderSharedDiscovery returns the rendered shared-discovery-role.yaml, or
-		// "" if the template produced no output (helm --output-dir omits the file).
+		// renderSharedDiscovery renders with createSharedDiscoveryRole enabled (the
+		// feature is opt-in), returning the file content or "" if helm omitted it.
 		renderSharedDiscovery := func(extraArgs ...string) string {
 			outputDir := GinkgoT().TempDir()
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
-			args := append(minimalOIDCArgs, extraArgs...)
+			args := append(minimalOIDCArgs,
+				helmSetFlag, "githubRbac.createSharedDiscoveryRole=true")
+			args = append(args, extraArgs...)
 			helmTemplate(chartDir, outputDir, args...)
 			data, err := os.ReadFile(filepath.Join(outputDir,
 				"jupyter-k8s-aws-oidc/templates/github-rbac/shared-discovery-role.yaml"))
@@ -133,7 +135,18 @@ var _ = Describe("GitHub RBAC", func() {
 			return string(data)
 		}
 
-		It("renders Role + RoleBinding in webApp.sharedNamespace with group subjects by default", func() {
+		It("does not render by default (createSharedDiscoveryRole off)", func() {
+			outputDir := GinkgoT().TempDir()
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+			helmTemplate(chartDir, outputDir, minimalOIDCArgs...)
+			_, err := os.ReadFile(filepath.Join(outputDir,
+				"jupyter-k8s-aws-oidc/templates/github-rbac/shared-discovery-role.yaml"))
+			Expect(err).To(HaveOccurred(),
+				"shared-discovery Role should be omitted unless createSharedDiscoveryRole=true")
+		})
+
+		It("renders Role + RoleBinding in webApp.sharedNamespace with group subjects when enabled", func() {
 			out := renderSharedDiscovery()
 			Expect(out).To(ContainSubstring("kind: Role"))
 			Expect(out).To(ContainSubstring("kind: RoleBinding"))
