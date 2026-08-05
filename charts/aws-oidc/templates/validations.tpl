@@ -38,6 +38,17 @@
 {{- fail "accessStrategy.createBearer requires authmiddleware.enableBearerAuth to be true" }}
 {{- end }}
 
+{{/* Validate: additionalNamespaces must not include the default workspace namespace (it is added automatically) */}}
+{{- if has .Values.webApp.workspacesDefaultNamespace .Values.webApp.workspaceNamespaceSelection.additionalNamespaces }}
+{{- fail (printf "webApp.workspaceNamespaceSelection.additionalNamespaces must not contain the default workspace namespace %q — it is always included automatically" .Values.webApp.workspacesDefaultNamespace) }}
+{{- end }}
+
+{{/* Validate: additionalNamespaces must not contain duplicates */}}
+{{- $additional := .Values.webApp.workspaceNamespaceSelection.additionalNamespaces }}
+{{- if ne (len $additional) (len (uniq $additional)) }}
+{{- fail (printf "webApp.workspaceNamespaceSelection.additionalNamespaces must not contain duplicates, got: %v" $additional) }}
+{{- end }}
+
 {{/* Validate JWT refresh settings */}}
 {{- $jwtRefreshWindowSeconds := 0 }}
 {{- if hasSuffix "h" .Values.authmiddleware.jwtRefreshWindow }}

@@ -37,6 +37,10 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.authmiddleware.affinity }}
+      affinity:
+        {{- toYaml .Values.authmiddleware.affinity | nindent 8 }}
+      {{- else }}
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -46,6 +50,11 @@ spec:
                   matchLabels:
                     app: authmiddleware
                 topologyKey: kubernetes.io/hostname
+      {{- end }}
+      {{- with .Values.authmiddleware.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       initContainers:
       - name: wait-for-dex
         image: {{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}

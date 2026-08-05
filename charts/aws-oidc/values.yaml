@@ -237,6 +237,11 @@ webApp:
   nodeSelector: {}
   # Tolerations for web-app pods (overrides chart-level tolerations)
   tolerations: []
+  # Pod affinity rules — replaces the built-in preferred hostname anti-affinity
+  # when set. Leave empty ({}) to use the chart default.
+  affinity: {}
+  # Pod topology spread constraints — empty by default.
+  topologySpreadConstraints: []
   # Enable or disable the web UI (default: true)
   enabled: true
   # replicas is used only when keda.enabled is false
@@ -262,8 +267,10 @@ webApp:
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-ui
   imageTag: v0.1.4
-  # Kubernetes namespace where workspaces are created and managed
-  namespace: default
+  # Default Kubernetes namespace where workspaces are created and managed. This
+  # is always part of the workspace-switcher's namespace universe; add more via
+  # workspaceNamespaceSelection.additionalNamespaces.
+  workspacesDefaultNamespace: default
   resources:
     limits:
       cpu: 500m
@@ -295,6 +302,33 @@ webApp:
     caCertBase64: ""
     # Localhost port for kubelogin OIDC callback
     oidcCallbackPort: 9800
+  # Namespace where shared workspace templates live (read with the user's OIDC
+  # token, not the SA). Default mirrors jupyter-k8s-ui server/k8s/config.ts.
+  sharedNamespace: "jupyter-k8s-shared"
+  # Log verbosity: debug | info | warn | error. Mirrors jupyter-k8s-ui prod default.
+  logLevel: "info"
+  # Namespace-selector configuration for the multi-namespace workspace switcher.
+  # Defaults kept in sync with jupyter-k8s-ui server/k8s/config.ts — mirror any
+  # UI-default change here.
+  workspaceNamespaceSelection:
+    # Extra workspace namespaces to expose in the switcher, IN ADDITION to
+    # webApp.workspacesDefaultNamespace (which is always included). Use this to
+    # offer a fixed multi-namespace set without relying on label-based cluster
+    # discovery, e.g. additionalNamespaces: ["team-a", "team-b"].
+    # Must NOT contain the default namespace (it's added automatically).
+    # Empty = single-namespace mode (just the default).
+    additionalNamespaces: []
+    # Label selector for auto-discovering workspace-enabled namespaces. Full
+    # selector syntax, e.g. "workspace.jupyter.org/workspaces-enabled=true" or
+    # "env in (prod,staging)". (The UI server also accepts a bare key via a
+    # separate env var; the chart exposes the selector as the superset.)
+    labelSelector: "workspace.jupyter.org/workspaces-enabled=true"
+    # SSAR fan-out page size (candidates access-checked per /namespaces page).
+    candidateCap: 20
+    # Max visible namespaces persisted in the preference cookie.
+    visiblePersistCap: 100
+    # Namespace universe re-list poll interval (seconds).
+    pollIntervalSecs: 60
 
 # Authmiddleware configuration
 authmiddleware:
@@ -302,6 +336,11 @@ authmiddleware:
   nodeSelector: {}
   # Tolerations for authmiddleware pods (overrides chart-level tolerations)
   tolerations: []
+  # Pod affinity rules — replaces the built-in preferred hostname anti-affinity
+  # when set. Leave empty ({}) to use the chart default.
+  affinity: {}
+  # Pod topology spread constraints — empty by default.
+  topologySpreadConstraints: []
   # Whether to deploy the authmiddleware component
   enabled: true
   # Number of replicas (used when keda.enabled is false)
