@@ -40,4 +40,71 @@ subjects:
   - kind: ServiceAccount
     name: web-app
     namespace: {{ .Values.namespace }}
+---
+# ClusterRole for namespace discovery (label-based workspace namespace list).
+# list only — the server polls listNamespace() on an interval (not a watch),
+# and makes no per-namespace get.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Values.namespace }}-web-app-namespace-discovery
+  labels:
+    app: web-app
+    component: web-app
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.namespace }}-web-app-namespace-discovery
+  labels:
+    app: web-app
+    component: web-app
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.namespace }}-web-app-namespace-discovery
+subjects:
+  - kind: ServiceAccount
+    name: web-app
+    namespace: {{ .Values.namespace }}
+---
+# ClusterRole for live CRD schema reading (YAML editor validation).
+# get, scoped by resourceNames to exactly the three CRDs the editor reads
+# (mirrors CRD_REGISTRY in jupyter-k8s-ui server/schema/store.ts). If the UI
+# adds a fourth CRD, this list must be updated in lockstep.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Values.namespace }}-web-app-crd-reader
+  labels:
+    app: web-app
+    component: web-app
+rules:
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    resourceNames:
+      - workspaces.workspace.jupyter.org
+      - workspacetemplates.workspace.jupyter.org
+      - workspaceaccessstrategies.workspace.jupyter.org
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.namespace }}-web-app-crd-reader
+  labels:
+    app: web-app
+    component: web-app
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.namespace }}-web-app-crd-reader
+subjects:
+  - kind: ServiceAccount
+    name: web-app
+    namespace: {{ .Values.namespace }}
 {{- end }}

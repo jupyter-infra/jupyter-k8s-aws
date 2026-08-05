@@ -1,0 +1,51 @@
+{{- if and .Values.githubRbac.create .Values.githubRbac.createOrgsRole }}
+# Read-only discovery of shared WorkspaceTemplates and WorkspaceAccessStrategies.
+# Grants end-users list/get with their OWN token so the web-app's editor and
+# template-select dropdowns can populate. Not required for a workspace to be
+# CREATED against a shared template — the operator resolves refs with its own SA.
+# Read-only by design (get/list, no watch, no mutation). Lands in
+# webApp.sharedNamespace (the namespace SHARED_TEMPLATE_NAMESPACE points at), NOT
+# the router release namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: github-shared-discovery-reader
+  namespace: {{ .Values.webApp.sharedNamespace }}
+  labels:
+    app: web-app
+    component: security
+rules:
+  - apiGroups: ["workspace.jupyter.org"]
+    resources: ["workspacetemplates", "workspaceaccessstrategies"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: github-shared-discovery-reader
+  namespace: {{ .Values.webApp.sharedNamespace }}
+  labels:
+    app: web-app
+    component: security
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: github-shared-discovery-reader
+subjects:
+{{- $orgs := .Values.githubRbac.orgs | default .Values.github.orgs }}
+{{- if $orgs }}
+{{- range $org := $orgs }}
+{{- if $org.teams }}
+{{- range $team := $org.teams }}
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: {{ $.Values.dex.oidcGroupPrefix }}{{ $org.name }}:{{ $team }}
+{{- end }}
+{{- else }}
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: {{ $.Values.dex.oidcGroupPrefix }}{{ $org.name }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
