@@ -99,7 +99,7 @@ var _ = Describe("Web App", func() {
 			Expect(val).To(Equal("https://api.test-cluster.example.com"))
 		})
 
-		It("should set NAMESPACE to the webApp.namespace default", func() {
+		It("should set NAMESPACE to the webApp.workspacesDefaultNamespace default", func() {
 			env := dep.Spec.Template.Spec.Containers[0].Env
 			val, found := getEnvVar(env, "NAMESPACE")
 			Expect(found).To(BeTrue(), "NAMESPACE not found in deployment env")
@@ -265,6 +265,166 @@ var _ = Describe("Web App", func() {
 		})
 	})
 
+	Context("namespace-selection env vars", func() {
+		renderWebAppEnv := func(extraArgs ...string) []corev1.EnvVar {
+			outputDir := GinkgoT().TempDir()
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+			args := append(oidcRequiredArgs(), helmSetFlag, "webApp.enabled=true")
+			args = append(args, extraArgs...)
+			helmTemplate(chartDir, outputDir, args...)
+
+			data, err := os.ReadFile(filepath.Join(outputDir,
+				"jupyter-k8s-aws-oidc/templates/web-app/deployment.yaml"))
+			Expect(err).NotTo(HaveOccurred())
+			var dep appsv1.Deployment
+			Expect(yaml.Unmarshal(data, &dep)).To(Succeed())
+			return dep.Spec.Template.Spec.Containers[0].Env
+		}
+
+		It("omits WORKSPACE_NAMESPACES when additionalNamespaces is empty (default)", func() {
+			// The server always unions in NAMESPACE (workspacesDefaultNamespace),
+			// so with no additional namespaces the chart emits nothing.
+			_, found := getEnvVar(renderWebAppEnv(), "WORKSPACE_NAMESPACES")
+			Expect(found).To(BeFalse(), "WORKSPACE_NAMESPACES should be omitted when additionalNamespaces is empty")
+		})
+
+		It("joins additionalNamespaces into a CSV for WORKSPACE_NAMESPACES", func() {
+			env := renderWebAppEnv(
+				helmSetFlag, "webApp.workspaceNamespaceSelection.additionalNamespaces[0]=team-a",
+				helmSetFlag, "webApp.workspaceNamespaceSelection.additionalNamespaces[1]=team-b",
+			)
+			val, found := getEnvVar(env, "WORKSPACE_NAMESPACES")
+			Expect(found).To(BeTrue())
+			// Only the additional namespaces — the default is unioned in by the server.
+			Expect(val).To(Equal("team-a,team-b"))
+		})
+
+		It("defaults WORKSPACE_NAMESPACE_LABEL_SELECTOR to the UI server default", func() {
+			val, found := getEnvVar(renderWebAppEnv(), "WORKSPACE_NAMESPACE_LABEL_SELECTOR")
+			Expect(found).To(BeTrue())
+			Expect(val).To(Equal("workspace.jupyter.org/workspaces-enabled=true"))
+		})
+
+		It("passes a non-default labelSelector through verbatim", func() {
+			// Comma escaped so helm --set does not treat it as a list separator.
+			env := renderWebAppEnv(
+				helmSetFlag, `webApp.workspaceNamespaceSelection.labelSelector=env in (prod\,staging)`,
+			)
+			val, found := getEnvVar(env, "WORKSPACE_NAMESPACE_LABEL_SELECTOR")
+			Expect(found).To(BeTrue())
+			Expect(val).To(Equal("env in (prod,staging)"))
+		})
+
+		It("emits the cap + poll defaults as quoted strings", func() {
+			env := renderWebAppEnv()
+			for name, want := range map[string]string{
+				"NAMESPACE_CANDIDATE_CAP":       "20",
+				"NAMESPACE_VISIBLE_PERSIST_CAP": "100",
+				"NAMESPACE_POLL_INTERVAL_SECS":  "60",
+			} {
+				val, found := getEnvVar(env, name)
+				Expect(found).To(BeTrue(), "%s not found", name)
+				Expect(val).To(Equal(want), "%s value mismatch", name)
+			}
+		})
+
+		It("always emits SHARED_TEMPLATE_NAMESPACE and LOG_LEVEL with their defaults", func() {
+			env := renderWebAppEnv()
+			val, found := getEnvVar(env, "SHARED_TEMPLATE_NAMESPACE")
+			Expect(found).To(BeTrue())
+			Expect(val).To(Equal("jupyter-k8s-shared"))
+			val, found = getEnvVar(env, "LOG_LEVEL")
+			Expect(found).To(BeTrue())
+			Expect(val).To(Equal("info"))
+		})
+	})
+
+	Context("pod scheduling: affinity & topologySpreadConstraints", func() {
+		renderWebAppPod := func(extraArgs ...string) corev1.PodSpec {
+			outputDir := GinkgoT().TempDir()
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+			args := append(oidcRequiredArgs(), helmSetFlag, "webApp.enabled=true")
+			args = append(args, extraArgs...)
+			helmTemplate(chartDir, outputDir, args...)
+
+			data, err := os.ReadFile(filepath.Join(outputDir,
+				"jupyter-k8s-aws-oidc/templates/web-app/deployment.yaml"))
+			Expect(err).NotTo(HaveOccurred())
+			var dep appsv1.Deployment
+			Expect(yaml.Unmarshal(data, &dep)).To(Succeed())
+			return dep.Spec.Template.Spec
+		}
+
+		It("renders the default preferred podAntiAffinity when affinity is unset", func() {
+			spec := renderWebAppPod()
+			Expect(spec.Affinity).NotTo(BeNil())
+			Expect(spec.Affinity.PodAntiAffinity).NotTo(BeNil())
+			Expect(spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).
+				To(HaveLen(1))
+			Expect(spec.TopologySpreadConstraints).To(BeEmpty())
+		})
+
+		It("replaces the default affinity entirely when affinity is set", func() {
+			spec := renderWebAppPod(
+				helmSetFlag, "webApp.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key=disktype",
+				helmSetFlag, "webApp.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator=Exists",
+			)
+			Expect(spec.Affinity).NotTo(BeNil())
+			Expect(spec.Affinity.NodeAffinity).NotTo(BeNil())
+			Expect(spec.Affinity.PodAntiAffinity).To(BeNil(),
+				"setting affinity must drop the chart's default podAntiAffinity")
+		})
+
+		It("renders topologySpreadConstraints when set", func() {
+			spec := renderWebAppPod(
+				helmSetFlag, "webApp.topologySpreadConstraints[0].maxSkew=1",
+				helmSetFlag, "webApp.topologySpreadConstraints[0].topologyKey=zone",
+				helmSetFlag, "webApp.topologySpreadConstraints[0].whenUnsatisfiable=DoNotSchedule",
+			)
+			Expect(spec.TopologySpreadConstraints).To(HaveLen(1))
+			Expect(spec.TopologySpreadConstraints[0].MaxSkew).To(Equal(int32(1)))
+			Expect(spec.TopologySpreadConstraints[0].TopologyKey).To(Equal("zone"))
+		})
+	})
+
+	Context("cluster-scoped RBAC (namespace-discovery + crd-reader)", func() {
+		readRBAC := func(extraArgs ...string) string {
+			outputDir := GinkgoT().TempDir()
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+			args := append(oidcRequiredArgs(), extraArgs...)
+			helmTemplate(chartDir, outputDir, args...)
+			path := filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates/web-app/rbac.yaml")
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return ""
+			}
+			return string(data)
+		}
+
+		It("renders namespace-qualified ClusterRole/ClusterRoleBinding names when enabled", func() {
+			out := readRBAC(helmSetFlag, "webApp.enabled=true")
+			// .Values.namespace default is jupyter-k8s-router.
+			Expect(out).To(ContainSubstring("jupyter-k8s-router-web-app-namespace-discovery"))
+			Expect(out).To(ContainSubstring("jupyter-k8s-router-web-app-crd-reader"))
+		})
+
+		It("scopes the crd-reader ClusterRole to exactly the three CRDs", func() {
+			out := readRBAC(helmSetFlag, "webApp.enabled=true")
+			Expect(out).To(ContainSubstring("workspaces.workspace.jupyter.org"))
+			Expect(out).To(ContainSubstring("workspacetemplates.workspace.jupyter.org"))
+			Expect(out).To(ContainSubstring("workspaceaccessstrategies.workspace.jupyter.org"))
+		})
+
+		It("renders neither cluster-scoped RBAC pair when webApp is disabled", func() {
+			out := readRBAC(helmSetFlag, "webApp.enabled=false")
+			Expect(out).NotTo(ContainSubstring("web-app-namespace-discovery"))
+			Expect(out).NotTo(ContainSubstring("web-app-crd-reader"))
+		})
+	})
+
 	Context("validation: incomplete clusterAccess", func() {
 		It("should fail when clusterName is set but apiServer is empty", func() {
 			chartDir := GinkgoT().TempDir()
@@ -294,6 +454,72 @@ var _ = Describe("Web App", func() {
 				Skip("Chart does not yet validate that apiServer is required when clusterName is set — " +
 					"add a template guard (required/fail) and remove this Skip")
 			}
+		})
+	})
+
+	Context("validation: additionalNamespaces must not contain the default", func() {
+		It("should fail when additionalNamespaces includes the default workspace namespace", func() {
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+
+			out, err := exec.Command("helm", "dependency", "build", chartDir).CombinedOutput()
+			Expect(err).NotTo(HaveOccurred(), "helm dependency build failed: %s", string(out))
+
+			args := append([]string{helmTemplateCmd, helmReleaseName, chartDir},
+				oidcRequiredArgs()...)
+			args = append(args,
+				helmSetFlag, "webApp.enabled=true",
+				helmSetFlag, "webApp.workspacesDefaultNamespace=team-x",
+				// team-x is the default → must be rejected in additionalNamespaces
+				helmSetFlag, "webApp.workspaceNamespaceSelection.additionalNamespaces[0]=team-x",
+			)
+
+			out, err = exec.Command("helm", args...).CombinedOutput()
+			Expect(err).To(HaveOccurred(), "helm template should fail when additionalNamespaces contains the default")
+			Expect(strings.ToLower(string(out))).To(
+				ContainSubstring("additionalnamespaces"),
+				"Expected validation error mentioning additionalNamespaces")
+		})
+
+		It("should succeed when additionalNamespaces excludes the default", func() {
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+
+			out, err := exec.Command("helm", "dependency", "build", chartDir).CombinedOutput()
+			Expect(err).NotTo(HaveOccurred(), "helm dependency build failed: %s", string(out))
+
+			args := append([]string{helmTemplateCmd, helmReleaseName, chartDir},
+				oidcRequiredArgs()...)
+			args = append(args,
+				helmSetFlag, "webApp.enabled=true",
+				helmSetFlag, "webApp.workspacesDefaultNamespace=team-x",
+				helmSetFlag, "webApp.workspaceNamespaceSelection.additionalNamespaces[0]=team-a",
+			)
+
+			out, err = exec.Command("helm", args...).CombinedOutput()
+			Expect(err).NotTo(HaveOccurred(), "helm template should succeed: %s", string(out))
+		})
+
+		It("should fail when additionalNamespaces contains duplicates", func() {
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+
+			out, err := exec.Command("helm", "dependency", "build", chartDir).CombinedOutput()
+			Expect(err).NotTo(HaveOccurred(), "helm dependency build failed: %s", string(out))
+
+			args := append([]string{helmTemplateCmd, helmReleaseName, chartDir},
+				oidcRequiredArgs()...)
+			args = append(args,
+				helmSetFlag, "webApp.enabled=true",
+				helmSetFlag, "webApp.workspaceNamespaceSelection.additionalNamespaces[0]=team-a",
+				helmSetFlag, "webApp.workspaceNamespaceSelection.additionalNamespaces[1]=team-a",
+			)
+
+			out, err = exec.Command("helm", args...).CombinedOutput()
+			Expect(err).To(HaveOccurred(), "helm template should fail on duplicate additionalNamespaces")
+			Expect(strings.ToLower(string(out))).To(
+				ContainSubstring("duplicate"),
+				"Expected validation error mentioning duplicates")
 		})
 	})
 })

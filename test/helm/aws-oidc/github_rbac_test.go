@@ -115,4 +115,70 @@ var _ = Describe("GitHub RBAC", func() {
 				"Should use githubRbac.orgs, not github.orgs, when explicitly set")
 		})
 	})
+
+	Context("shared-discovery Role (bare-install parity)", func() {
+		// renderSharedDiscovery returns the rendered shared-discovery-role.yaml, or
+		// "" if the template produced no output (helm --output-dir omits the file).
+		renderSharedDiscovery := func(extraArgs ...string) string {
+			outputDir := GinkgoT().TempDir()
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+			args := append(minimalOIDCArgs, extraArgs...)
+			helmTemplate(chartDir, outputDir, args...)
+			data, err := os.ReadFile(filepath.Join(outputDir,
+				"jupyter-k8s-aws-oidc/templates/github-rbac/shared-discovery-role.yaml"))
+			if err != nil {
+				return ""
+			}
+			return string(data)
+		}
+
+		It("renders Role + RoleBinding in webApp.sharedNamespace with group subjects by default", func() {
+			out := renderSharedDiscovery()
+			Expect(out).To(ContainSubstring("kind: Role"))
+			Expect(out).To(ContainSubstring("kind: RoleBinding"))
+			Expect(out).To(ContainSubstring("name: github-shared-discovery-reader"))
+			Expect(out).To(ContainSubstring("namespace: jupyter-k8s-shared"))
+			Expect(out).To(ContainSubstring("workspacetemplates"))
+			Expect(out).To(ContainSubstring("workspaceaccessstrategies"))
+			// minimalOIDCArgs sets github.orgs[0]={some-org, teams:[devs]}.
+			Expect(out).To(ContainSubstring("github:some-org:devs"))
+		})
+
+		It("does not render when githubRbac.create is false", func() {
+			Expect(renderSharedDiscovery(helmSetFlag, "githubRbac.create=false")).To(BeEmpty())
+		})
+
+		It("does not render when createOrgsRole is false", func() {
+			Expect(renderSharedDiscovery(helmSetFlag, "githubRbac.createOrgsRole=false")).To(BeEmpty())
+		})
+
+		It("lands in webApp.sharedNamespace, not the router namespace or githubRbac.namespace", func() {
+			out := renderSharedDiscovery(
+				helmSetFlag, "webApp.sharedNamespace=my-shared",
+				helmSetFlag, "githubRbac.namespace=rbac-ns",
+			)
+			Expect(out).To(ContainSubstring("namespace: my-shared"))
+			Expect(out).NotTo(ContainSubstring("namespace: jupyter-k8s-router"))
+			Expect(out).NotTo(ContainSubstring("namespace: rbac-ns"))
+		})
+
+		It("renders one Group subject per team, and the org itself when teamless", func() {
+			// Two teams under one org → two team-scoped Group subjects.
+			multi := renderSharedDiscovery(
+				helmSetFlag, "githubRbac.orgs[0].name=acme",
+				helmSetFlag, "githubRbac.orgs[0].teams[0]=t1",
+				helmSetFlag, "githubRbac.orgs[0].teams[1]=t2",
+			)
+			Expect(multi).To(ContainSubstring("github:acme:t1"))
+			Expect(multi).To(ContainSubstring("github:acme:t2"))
+
+			// Org with no teams → a single org-level Group subject.
+			teamless := renderSharedDiscovery(
+				helmSetFlag, "githubRbac.orgs[0].name=acme",
+			)
+			Expect(teamless).To(ContainSubstring("name: github:acme"))
+			Expect(teamless).NotTo(ContainSubstring("github:acme:"))
+		})
+	})
 })
