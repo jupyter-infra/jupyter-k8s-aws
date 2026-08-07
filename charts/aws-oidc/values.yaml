@@ -272,7 +272,7 @@ webApp:
   imagePullPolicy: Always
   repository: ghcr.io/jupyter-infra
   imageName: jupyter-k8s-ui
-  imageTag: v0.1.4
+  imageTag: v0.1.5
   # Default Kubernetes namespace where workspaces are created and managed. This
   # is always part of the workspace-switcher's namespace universe; add more via
   # workspaceNamespaceSelection.additionalNamespaces.
