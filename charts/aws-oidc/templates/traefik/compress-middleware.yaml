@@ -1,0 +1,15 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: compress
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: traefik
+    component: router
+spec:
+  compress:
+    # SSE must NOT be compressed — compressing text/event-stream buffers/breaks
+    # JupyterLab live event delivery. Traefik v3.7.9 does NOT exclude it by
+    # default (default excludes are only application/grpc), so exclude it here.
+    excludedContentTypes:
+      - text/event-stream

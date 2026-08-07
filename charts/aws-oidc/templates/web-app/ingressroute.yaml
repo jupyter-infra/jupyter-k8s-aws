@@ -16,6 +16,8 @@ spec:
       priority: 15
       kind: Rule
       middlewares:
+        - name: compress
+          namespace: {{ .Values.namespace }}
         - name: auth-headers
           namespace: {{ .Values.namespace }}
         - name: web-app-csp
@@ -43,6 +45,8 @@ spec:
       priority: 10
       kind: Rule
       middlewares:
+        - name: compress
+          namespace: {{ .Values.namespace }}
         - name: auth-headers
           namespace: {{ .Values.namespace }}
         - name: web-app-csp
@@ -72,6 +76,8 @@ spec:
       priority: 5
       kind: Rule
       middlewares:
+        - name: compress
+          namespace: {{ .Values.namespace }}
         - name: auth-headers
           namespace: {{ .Values.namespace }}
         - name: web-app-csp

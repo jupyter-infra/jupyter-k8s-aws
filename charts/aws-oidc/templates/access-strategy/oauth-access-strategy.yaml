@@ -50,6 +50,8 @@ spec:
               kind: Rule
               priority: 100
               middlewares:
+                - name: compress
+                  namespace: {{ .Values.namespace }}
                 - name: auth-headers
                   namespace: {{ .Values.namespace }}
                 - name: authmiddleware-verify
@@ -70,6 +72,8 @@ spec:
               kind: Rule
               priority: 110
               middlewares:
+                - name: compress
+                  namespace: {{ .Values.namespace }}
                 - name: auth-headers
                   namespace: {{ .Values.namespace }}
                 - name: oauth-auth-redirect

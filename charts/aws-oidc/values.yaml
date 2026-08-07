@@ -94,6 +94,22 @@ traefik:
   nodeSelector: {}
   # Tolerations for traefik pods (overrides chart-level tolerations)
   tolerations: []
+  # Pod affinity rules — replaces the built-in preferred hostname anti-affinity
+  # when set. Leave empty ({}) to use the chart default.
+  affinity: {}
+  # Pod topology spread constraints — empty by default.
+  topologySpreadConstraints: []
+  # JSON access logs to stdout (per-request status/middleware/timing), consumed
+  # by Fluent Bit → CloudWatch in jupyter-deploy. Default off → rendered args
+  # unchanged. Emits --accesslog=true --accesslog.format=json with the
+  # Authorization header redacted. For anything more (format, filters, extra
+  # redactions), use extraArgs below.
+  accessLog:
+    enabled: false
+  # Arbitrary extra Traefik CLI args, appended after the chart's args (so a flag
+  # here overrides an earlier one, e.g. accessLog.* above). Example:
+  #   extraArgs: ["--accesslog.filters.statuscodes=400-599"]
+  extraArgs: []
 
 # Dex configuration
 dex:
