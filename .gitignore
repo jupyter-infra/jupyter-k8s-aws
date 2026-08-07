@@ -48,3 +48,8 @@ ci/.venv/
 __pycache__/
 *.pyc
 *.pyo
+
+# Local scratch: planning notes and draft PR bodies (not committed)
+*-plan.md
+*-issue.md
+pr.md
