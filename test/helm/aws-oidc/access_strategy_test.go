@@ -67,6 +67,15 @@ var _ = Describe("Access Strategy", func() {
 			Expect(os.IsNotExist(err)).To(BeTrue(),
 				"bearer-access-strategy.yaml should not be rendered when createBearer=false")
 		})
+
+		It("should enable compression on the workspace routes", func() {
+			// Intent: JupyterLab asset paths are served compressed. The routes are
+			// embedded template strings in the CR, so assert on rendered content.
+			data, err := os.ReadFile(filepath.Join(templatesDir, oauthStrategyFile))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(data)).To(ContainSubstring("name: compress"),
+				"oauth workspace routes should attach the compress middleware")
+		})
 	})
 
 	Context("with custom namespace", func() {
