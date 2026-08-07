@@ -102,8 +102,9 @@ traefik:
   # JSON access logs to stdout (per-request status/middleware/timing), consumed
   # by Fluent Bit → CloudWatch in jupyter-deploy. Default off → rendered args
   # unchanged. Emits --accesslog=true --accesslog.format=json with the
-  # Authorization header redacted. For anything more (format, filters, extra
-  # redactions), use extraArgs below.
+  # Authorization header redacted and query strings dropped (the /oauth2/callback
+  # and /dex routes carry OAuth code/state params that must not reach CloudWatch).
+  # For anything more (format, filters, keeping query params), use extraArgs below.
   accessLog:
     enabled: false
   # Arbitrary extra Traefik CLI args, appended after the chart's args (so a flag

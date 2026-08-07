@@ -73,11 +73,14 @@ var _ = Describe("Traefik", func() {
 			Expect(containerArgs(readDeployment(render()))).NotTo(ContainSubstring("--accesslog"))
 		})
 
-		It("emits JSON access logs with Authorization redacted when enabled", func() {
+		It("emits JSON access logs with Authorization redacted and query strings dropped when enabled", func() {
 			args := containerArgs(readDeployment(render(helmSetFlag, "traefik.accessLog.enabled=true")))
 			Expect(args).To(ContainSubstring("--accesslog=true"))
 			Expect(args).To(ContainSubstring("--accesslog.format=json"))
 			Expect(args).To(ContainSubstring("--accesslog.fields.headers.names.Authorization=redact"))
+			// Query strings dropped so OAuth code/state on /oauth2/callback + /dex
+			// never reach CloudWatch.
+			Expect(args).To(ContainSubstring("--accesslog.fields.queryParameters.defaultMode=drop"))
 		})
 
 		It("appends extraArgs verbatim", func() {

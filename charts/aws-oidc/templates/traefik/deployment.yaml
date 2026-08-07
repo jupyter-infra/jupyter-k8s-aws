@@ -146,6 +146,11 @@ spec:
           - "--accesslog=true"
           - "--accesslog.format=json"
           - "--accesslog.fields.headers.names.Authorization=redact"
+          # Drop query strings — the /oauth2/callback and /dex routes carry OAuth
+          # `code`/`state` params that must not land in CloudWatch. Traefik only
+          # supports bulk keep/drop for query params (no per-param redact). To
+          # keep them for debugging, override via traefik.extraArgs.
+          - "--accesslog.fields.queryParameters.defaultMode=drop"
         {{- end }}
         {{- range .Values.traefik.extraArgs }}
           - {{ . | quote }}
