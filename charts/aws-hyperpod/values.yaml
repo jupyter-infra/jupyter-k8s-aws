@@ -40,7 +40,9 @@ clusterWebUI:
     imageName: traefik
     imageTag: latest
     replicas: 2
-    redirectHttp: true
+    # ALB handles HTTP→HTTPS redirect via ssl-redirect annotation.
+    # Traefik redirect is redundant and breaks in Traefik 3.7+ (websecure entrypoint not defined).
+    redirectHttp: false
     debug: false
     allowCrossNamespace: true
 
