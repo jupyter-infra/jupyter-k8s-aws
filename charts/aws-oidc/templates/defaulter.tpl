@@ -16,6 +16,44 @@ Auto-generate secrets if not provided
 {{- end -}}
 
 {{/*
+Render a map as the comma-separated "k1=v1,k2=v2" list the AWS load balancer annotations
+expect. Keys are sorted so the rendered Service is stable across upgrades (Helm map
+iteration order is otherwise arbitrary and would churn the annotation on every render).
+*/}}
+{{- define "traefik.keyValueList" -}}
+{{- $map := . -}}
+{{- $pairs := list -}}
+{{- range $k := keys $map | sortAlpha -}}
+{{- $pairs = append $pairs (printf "%s=%s" $k (get $map $k | toString)) -}}
+{{- end -}}
+{{- join "," $pairs -}}
+{{- end -}}
+
+{{/*
+Port and scheme each component is reached on, which move together when internalTls
+turns on. Defined once so the Service, NetworkPolicy, IngressRoute and ForwardAuth
+references can never drift apart.
+
+Emit the port UNQUOTED at the call site: NetworkPolicy and Service ports are
+IntOrString, so a quoted "5554" would be read as a named port, not a number.
+*/}}
+{{- define "defaulter.dexPort" -}}
+{{- if and .Values.internalTls.enabled .Values.internalTls.dex -}}5554{{- else -}}5556{{- end -}}
+{{- end -}}
+
+{{- define "defaulter.dexScheme" -}}
+{{- if and .Values.internalTls.enabled .Values.internalTls.dex -}}https{{- else -}}http{{- end -}}
+{{- end -}}
+
+{{- define "defaulter.oauth2ProxyPort" -}}
+{{- if and .Values.internalTls.enabled .Values.internalTls.oauth2Proxy -}}4443{{- else -}}4180{{- end -}}
+{{- end -}}
+
+{{- define "defaulter.oauth2ProxyScheme" -}}
+{{- if and .Values.internalTls.enabled .Values.internalTls.oauth2Proxy -}}https{{- else -}}http{{- end -}}
+{{- end -}}
+
+{{/*
 Convert rotation interval to cron schedule.
 Supports common durations: "Xm" (minutes), "Xh" (hours).
 Examples: "5m" converts to every 5 minutes, "1h" converts to every hour.
