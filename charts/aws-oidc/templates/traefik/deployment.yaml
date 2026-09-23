@@ -124,7 +124,11 @@ spec:
           - "--entrypoints.web.address=:8000/tcp"
           - "--entrypoints.web.forwardedHeaders.insecure=true"
         {{- if .Values.traefik.redirectHttp }}
-          - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+          # Redirect to the port :443 rather than to the `websecure` entrypoint by name.
+          # Naming the entrypoint makes Traefik build the Location header from that
+          # entrypoint's CONTAINER port, emitting https://<host>:8443/ — which no client
+          # can reach. The load balancer listens on 443.
+          - "--entrypoints.web.http.redirections.entryPoint.to=:443"
           - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
           - "--entrypoints.web.http.redirections.entryPoint.permanent=true"
         {{- end }}
