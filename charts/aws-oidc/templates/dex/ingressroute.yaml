@@ -12,5 +12,9 @@ spec:
       priority: 10
       services:
         - name: dex
-          port: 5556
+          port: {{ include "defaulter.dexPort" . }}
+{{- if and .Values.internalTls.enabled .Values.internalTls.dex }}
+          scheme: https
+          serversTransport: internal-dex
+{{- end }}
   tls: {}

@@ -85,11 +85,21 @@ spec:
               name: github-client
               key: client-secret
         ports:
+{{- if and .Values.internalTls.enabled .Values.internalTls.dex }}
+        - name: https
+          containerPort: 5554
+{{- else }}
         - name: http
           containerPort: 5556
+{{- end }}
         volumeMounts:
         - name: config
           mountPath: /etc/dex/config
+{{- if and .Values.internalTls.enabled .Values.internalTls.dex }}
+        - name: internal-tls
+          mountPath: /etc/dex/tls
+          readOnly: true
+{{- end }}
         # Gate readiness on a real signing key, not just the HTTP server binding.
         # /dex/healthz returns 200 as soon as the server binds — before the first
         # key rotation — so a pod can go Ready while /dex/keys serves an empty JWKS.
@@ -108,6 +118,21 @@ spec:
           # validations.tpl; max 1 only keeps this from dividing by zero so that
           # guard produces the error rather than a raw template panic.
           failureThreshold: {{ div (.Values.dex.keyCheck.timeout_seconds | int) (max 1 (.Values.dex.keyCheck.period_seconds | int)) }}
+{{- if and .Values.internalTls.enabled .Values.internalTls.dex }}
+        # Probe the localhost-only plaintext listener rather than the TLS port: the
+        # network-facing port is HTTPS and kubelet would not verify its certificate
+        # anyway, so this keeps the probes simple and the TLS port for real traffic.
+        readinessProbe:
+          exec:
+            command: ["sh", "-c", "wget -q -O - http://127.0.0.1:5556/dex/healthz"]
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command: ["sh", "-c", "wget -q -O - http://127.0.0.1:5556/dex/healthz"]
+          initialDelaySeconds: 15
+          periodSeconds: 20
+{{- else }}
         readinessProbe:
           httpGet:
             path: /dex/healthz
@@ -120,6 +145,7 @@ spec:
             port: 5556
           initialDelaySeconds: 15
           periodSeconds: 20
+{{- end }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -135,3 +161,8 @@ spec:
           items:
           - key: config.yaml
             path: config.yaml
+{{- if and .Values.internalTls.enabled .Values.internalTls.dex }}
+      - name: internal-tls
+        secret:
+          secretName: dex-internal-tls
+{{- end }}

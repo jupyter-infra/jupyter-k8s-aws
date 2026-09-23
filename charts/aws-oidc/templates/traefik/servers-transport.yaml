@@ -1,0 +1,32 @@
+{{- if .Values.internalTls.enabled }}
+{{/*
+One ServersTransport per upstream, because serverName differs and a ServersTransport
+carries exactly one.
+
+serverName is NOT optional here. Traefik resolves an IngressRoute's Service to POD IPs
+and load-balances across them (nativeLB is false by default), so each TLS handshake
+targets an IP address. With no serverName the verification target is that IP, which no
+certificate SAN will ever match, and every request fails with a 502.
+
+rootCAsSecrets reads the `ca.crt` key that cert-manager writes into each certificate it
+issues from a CA issuer, so each component's own secret doubles as the trust source and
+there is no separate CA bundle to distribute.
+*/}}
+{{- $ns := .Values.namespace }}
+{{- range $component := list "dex" "oauth2-proxy" }}
+{{- $enabled := ternary $.Values.internalTls.dex $.Values.internalTls.oauth2Proxy (eq $component "dex") }}
+{{- if $enabled }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: internal-{{ $component }}
+  namespace: {{ $ns }}
+spec:
+  serverName: {{ $component }}.{{ $ns }}.svc.cluster.local
+  insecureSkipVerify: false
+  rootCAsSecrets:
+    - {{ $component }}-internal-tls
+{{- end }}
+{{- end }}
+{{- end }}

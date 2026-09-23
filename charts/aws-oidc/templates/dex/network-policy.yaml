@@ -25,7 +25,7 @@ spec:
         matchLabels:
           kubernetes.io/metadata.name: {{ .Values.namespace }}
     ports:
-    - port: 5556
+    - port: {{ include "defaulter.dexPort" . }}
       protocol: TCP
   # Allow in-cluster wait-for-dex health gate from oauth2-proxy/authmiddleware init containers
   - from:
@@ -40,7 +40,7 @@ spec:
         matchLabels:
           kubernetes.io/metadata.name: {{ .Values.namespace }}
     ports:
-    - port: 5556
+    - port: {{ include "defaulter.dexPort" . }}
       protocol: TCP
   egress:
   # Allow DNS resolution

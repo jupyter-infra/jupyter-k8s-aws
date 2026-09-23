@@ -11,7 +11,18 @@ data:
       config:
         inCluster: true
     web:
+{{- if and .Values.internalTls.enabled .Values.internalTls.dex }}
+      # Serve HTTPS to the network, and keep the plaintext listener bound to localhost
+      # purely so the probes can reach it. Dex's startupProbe has to parse /dex/keys for
+      # a "kid", which needs a shell either way, so probing over localhost costs nothing
+      # and leaves no unauthenticated Dex port reachable from the namespace.
+      http: 127.0.0.1:5556
+      https: 0.0.0.0:5554
+      tlsCert: /etc/dex/tls/tls.crt
+      tlsKey: /etc/dex/tls/tls.key
+{{- else }}
       http: 0.0.0.0:5556
+{{- end }}
     staticClients:
     - id: {{ .Values.dex.kubernetesClientId }}
       redirectURIs:

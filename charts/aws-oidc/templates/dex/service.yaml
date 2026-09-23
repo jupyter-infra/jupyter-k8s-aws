@@ -9,9 +9,15 @@ metadata:
 spec:
   type: ClusterIP
   ports:
+{{- if and .Values.internalTls.enabled .Values.internalTls.dex }}
+  - name: https
+    port: 5554
+    targetPort: https
+{{- else }}
   - name: http
     port: 5556
     targetPort: http
+{{- end }}
   selector:
     app: dex
     component: oauth
