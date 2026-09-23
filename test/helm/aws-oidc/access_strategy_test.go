@@ -17,7 +17,7 @@ import (
 // minimalOIDCArgs are the required values for rendering the aws-oidc chart.
 var minimalOIDCArgs = []string{
 	helmSetFlag, "domain=test.example.com",
-	helmSetFlag, "certManager.email=admin@example.com",
+	helmSetFlag, "tls.acm.certificateArn=arn:aws:acm:us-west-2:123456789012:certificate/0000-1111",
 	helmSetFlag, "github.clientId=cid",
 	helmSetFlag, "github.clientSecret=csec",
 	helmSetFlag, "github.orgs[0].name=some-org",

@@ -21,6 +21,9 @@ const (
 	helmTemplateCmd   = "template"
 	helmOutputDirFlag = "--output-dir"
 
+	oauth2ProxyDeployFile    = "oauth2-proxy/deployment.yaml"
+	authmiddlewareDeployFile = "authmiddleware/deployment.yaml"
+
 	oauthStrategyFile     = "access-strategy/oauth-access-strategy.yaml"
 	bearerStrategyFile    = "access-strategy/bearer-access-strategy.yaml"
 	websocketStrategyFile = "access-strategy/websocket-access-strategy.yaml"
@@ -35,7 +38,7 @@ const (
 func oidcRequiredArgs() []string {
 	return []string{
 		helmSetFlag, "domain=test.example.com",
-		helmSetFlag, "certManager.email=admin@example.com",
+		helmSetFlag, "tls.acm.certificateArn=arn:aws:acm:us-west-2:123456789012:certificate/0000-1111",
 		helmSetFlag, "storageClass.efs.parameters.fileSystemId=fs-000",
 		helmSetFlag, "github.clientId=cid",
 		helmSetFlag, "github.clientSecret=csec",

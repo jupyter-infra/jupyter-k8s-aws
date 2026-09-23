@@ -24,6 +24,42 @@ domain: ""
 externalDns:
   enabled: true
 
+# [TLS]: public TLS terminates at an AWS NLB with an ACM certificate, which then
+# RE-ENCRYPTS to Traefik. Traefik presents a cert-manager certificate from the private CA
+# below; the NLB does not verify it, so it needs no public trust.
+#
+# Provisioned by the in-tree cloud-provider-aws service controller that every EKS cluster
+# already runs — the AWS Load Balancer Controller is NOT required.
+tls:
+  acm:
+    # ARN of the ACM certificate the NLB presents. Required.
+    certificateArn: ""
+    # TLS security policy applied to the NLB's TLS listener.
+    sslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+  # Private CA that cert-manager mints in this namespace, used for the Traefik
+  # certificate and for every internalTls certificate below. Leaf
+  # lifetimes are deliberately long: some upstreams cannot reload a rotated
+  # certificate without a pod restart (see internalTls notes).
+  internalCa:
+    caDuration: 87600h # 10y — the CA itself
+    caRenewBefore: 8760h
+    duration: 8760h # 1y — leaf certificates
+    renewBefore: 720h
+
+# [INTERNAL TLS]: encrypt the hops from Traefik to this chart's own components with
+# the tls.internalCa private CA.
+#
+# Off by default. dex and oauth2-proxy can serve HTTPS today; authmiddleware and the
+# web app cannot yet, and the chart rejects enabling them until their images gain the
+# capability:
+#   authmiddleware -> https://github.com/jupyter-infra/jupyter-k8s/issues/479
+#   web app        -> https://github.com/jupyter-infra/jupyter-k8s-ui/issues/71
+internalTls:
+  enabled: false
+  dex: true
+  oauth2Proxy: true
+  authmiddleware: false
+  webApp: false
 
 # [STORAGE] StorageClasses for Workspaces
 storageClass:
@@ -51,13 +87,6 @@ storageClass:
       uid: "65532"
       gid: "65532"
 
-# [CERT-MANAGER]: Configuration for cert-manager
-certManager:
-  # Email address for Let's Encrypt notifications
-  email: ""
-  # Whether to use staging or production Let's Encrypt server
-  useStaging: false
-
 # [TRAEFIK]: Configuration for Traefik
 traefik:
   # Always enabled for this chart
@@ -84,6 +113,20 @@ traefik:
     # Scale up when average open connections per replica exceeds this threshold.
     targetOpenConnections: "100"
     prometheusAddress: "http://prometheus-server.monitoring.svc.cluster.local:80"
+  # Restrict which nodes the NLB registers as targets, given as label key/value pairs.
+  # Empty ({}) registers EVERY node in the cluster, which is the Kubernetes default.
+  #
+  # NLB targets are node instances on the Service NodePort, not pods, so without this
+  # every node — including workspace nodes that never run Traefik — sits in the target
+  # group and forwards through kube-proxy. Restricting to the routing tier keeps the
+  # target group small and every hop on nodes provisioned for it. Example:
+  #
+  #   targetNodeLabels:
+  #     jupyter-deploy/role: routing
+  #
+  # All pairs must match (AND). Keep this consistent with traefik.nodeSelector below:
+  # if the selected nodes cannot run Traefik pods, every target fails its health check.
+  targetNodeLabels: {}
   # Redirect HTTP to HTTPS
   redirectHttp: true
   # Whether to configure traefik at 'debug' log level ('info' if omitted)

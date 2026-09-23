@@ -34,8 +34,8 @@ var _ = Describe("Node Selector and Tolerations", func() {
 		deployments := []string{
 			"traefik/deployment.yaml",
 			"dex/deployment.yaml",
-			"oauth2-proxy/deployment.yaml",
-			"authmiddleware/deployment.yaml",
+			oauth2ProxyDeployFile,
+			authmiddlewareDeployFile,
 		}
 
 		for _, d := range deployments {
@@ -71,7 +71,7 @@ var _ = Describe("Node Selector and Tolerations", func() {
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			helmTemplate(chartDir, outputDir,
 				helmSetFlag, "domain=test.example.com",
-				helmSetFlag, "certManager.email=admin@example.com",
+				helmSetFlag, "tls.acm.certificateArn=arn:aws:acm:us-west-2:123456789012:certificate/0000-1111",
 				helmSetFlag, "storageClass.efs.parameters.fileSystemId=fs-000",
 				helmSetFlag, "github.clientId=cid",
 				helmSetFlag, "github.clientSecret=csec",
@@ -95,8 +95,8 @@ var _ = Describe("Node Selector and Tolerations", func() {
 			deployments := []string{
 				"traefik/deployment.yaml",
 				"dex/deployment.yaml",
-				"oauth2-proxy/deployment.yaml",
-				"authmiddleware/deployment.yaml",
+				oauth2ProxyDeployFile,
+				authmiddlewareDeployFile,
 				"web-app/deployment.yaml",
 			}
 
@@ -154,7 +154,7 @@ var _ = Describe("Node Selector and Tolerations", func() {
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			helmTemplate(chartDir, outputDir,
 				helmSetFlag, "domain=test.example.com",
-				helmSetFlag, "certManager.email=admin@example.com",
+				helmSetFlag, "tls.acm.certificateArn=arn:aws:acm:us-west-2:123456789012:certificate/0000-1111",
 				helmSetFlag, "storageClass.efs.parameters.fileSystemId=fs-000",
 				helmSetFlag, "github.clientId=cid",
 				helmSetFlag, "github.clientSecret=csec",

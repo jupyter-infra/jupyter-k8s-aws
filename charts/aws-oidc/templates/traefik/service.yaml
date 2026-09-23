@@ -10,12 +10,37 @@ metadata:
     {{- if .Values.externalDns.enabled }}
     external-dns.alpha.kubernetes.io/hostname: "{{ .Values.domain }}"
     {{- end }}
-    # Use the legacy annotation (not the newer "external") which does not work in hyperpod
+    # The NLB terminates TLS with the ACM certificate and RE-ENCRYPTS to Traefik
+    # (backend-protocol: ssl), so no request crosses the VPC in plaintext and Traefik
+    # still sees HTTPS on its websecure entrypoint — which is what lets every
+    # `tls: {}` IngressRoute in this chart work without modification.
+    #
+    # "nlb" keeps the Service on the in-tree cloud-provider-aws service controller,
+    # which every EKS cluster already runs. It handles the ACM TLS listener AND the
+    # re-encryption: backend-protocol: ssl makes it set the target group protocol to
+    # TLS. The AWS Load Balancer Controller is deliberately NOT a prerequisite; the only
+    # thing it would add here is `ip` target mode, which trades an in-cluster hop for a
+    # controller to operate. Use targetNodeLabels below to keep the target group tight.
     service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
-    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
     service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
-    # Pass TLS traffic to Traefik as TCP to allow Traefik to handle TLS termination using Let's Encrypt
-    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: {{ .Values.tls.acm.certificateArn | quote }}
+    # Only the websecure port gets a TLS listener; port 80 stays a plain TCP listener so
+    # Traefik's own HTTP->HTTPS redirect (traefik.redirectHttp) keeps working.
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "websecure"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "ssl"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy: {{ .Values.tls.acm.sslPolicy | quote }}
+    {{- with .Values.traefik.targetNodeLabels }}
+    # Register only the routing tier as NLB targets instead of every node. See values.yaml.
+    service.beta.kubernetes.io/aws-load-balancer-target-node-labels: {{ include "traefik.keyValueList" . | quote }}
+    {{- end }}
+    # No healthcheck-* annotations on purpose. Targets are node instances on the
+    # NodePort, not pods, so Traefik's /ping on port 9000 is not reachable from the NLB
+    # (it has no NodePort) and an HTTP check against the traffic port would fail against
+    # a TLS listener. The in-tree default — TCP on traffic-port — is what we want, and
+    # leaving it implicit keeps externalTrafficPolicy: Local able to upgrade it to a real
+    # HTTP check on the health-check NodePort. Pod-level health stays with the readiness
+    # probe: an unready pod leaves the Service endpoints and kube-proxy stops forwarding.
+    #
     # Configure NLB attributes according to AWS docs using the consolidated attributes approach
     # refer to https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancerAttribute.html
     # service.beta.kubernetes.io/aws-load-balancer-attributes: "load_balancing.cross_zone.enabled=true,access_logs.s3.enabled=false"

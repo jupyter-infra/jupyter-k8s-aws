@@ -13,8 +13,27 @@
 {{- end }}
 {{- end }}
 
-{{- if not .Values.certManager.email }}
-{{- fail "certManager.email is required" }}
+{{- if not .Values.tls.acm.certificateArn }}
+{{- fail "tls.acm.certificateArn is required" }}
+{{- end }}
+
+{{/* Guard the removed Let's Encrypt keys explicitly. With --reset-then-reuse-values a stored
+     value from an older release would otherwise be silently ignored, leaving the operator to
+     think TLS is still configured the old way. */}}
+{{- if .Values.certManager }}
+{{- fail "certManager.* was removed — TLS now terminates at the NLB with tls.acm.certificateArn (Let's Encrypt is no longer supported)" }}
+{{- end }}
+{{- if .Values.tls.mode }}
+{{- fail "tls.mode was removed — ACM is the only supported mode; drop the key and set tls.acm.certificateArn" }}
+{{- end }}
+
+{{/* Validate: reject the two components whose images cannot serve TLS yet. Failing here beats
+     rendering an https:// upstream that every request would then fail to reach. */}}
+{{- if and .Values.internalTls.enabled .Values.internalTls.authmiddleware }}
+{{- fail "internalTls.authmiddleware is not supported yet — the authmiddleware image cannot serve TLS (see jupyter-infra/jupyter-k8s#479)" }}
+{{- end }}
+{{- if and .Values.internalTls.enabled .Values.internalTls.webApp }}
+{{- fail "internalTls.webApp is not supported yet — the jupyter-k8s-ui image cannot serve TLS (see jupyter-infra/jupyter-k8s-ui#71)" }}
 {{- end }}
 
 {{- if not .Values.github.clientId }}

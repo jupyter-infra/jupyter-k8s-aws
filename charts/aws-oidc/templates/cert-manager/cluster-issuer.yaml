@@ -1,27 +1,45 @@
+{{/*
+The NLB owns the publicly trusted certificate (ACM), so everything the cluster itself serves
+is signed by a private CA that this chart mints and owns end to end.
+
+Namespace-scoped Issuers, not ClusterIssuers: the CA is only ever consumed by this release's
+own components, so there is nothing to coordinate cluster-wide and nothing left behind for
+another namespace to trust.
+
+Chain: a self-signed bootstrap Issuer signs the CA certificate, which then backs the CA
+Issuer that every leaf certificate references.
+*/}}
 apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
+kind: Issuer
 metadata:
-  name: letsencrypt-prod
+  name: internal-selfsigned
+  namespace: {{ .Values.namespace }}
 spec:
-  acme:
-    email: {{ .Values.certManager.email }}
-    server: https://acme-v02.api.letsencrypt.org/directory
-    privateKeySecretRef:
-      name: letsencrypt-prod-account-key
-    solvers:
-    - dns01:
-        route53: {}
+  selfSigned: {}
 ---
 apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
+kind: Certificate
 metadata:
-  name: letsencrypt-staging
+  name: internal-ca
+  namespace: {{ .Values.namespace }}
 spec:
-  acme:
-    email: {{ .Values.certManager.email }}
-    server: https://acme-staging-v02.api.letsencrypt.org/directory
-    privateKeySecretRef:
-      name: letsencrypt-staging-account-key
-    solvers:
-    - dns01:
-        route53: {}
+  isCA: true
+  commonName: jupyter-k8s-internal-ca
+  secretName: internal-ca-tls
+  duration: {{ .Values.tls.internalCa.caDuration }}
+  renewBefore: {{ .Values.tls.internalCa.caRenewBefore }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: internal-selfsigned
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: internal-ca
+  namespace: {{ .Values.namespace }}
+spec:
+  ca:
+    secretName: internal-ca-tls

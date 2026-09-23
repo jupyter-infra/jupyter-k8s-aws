@@ -1,3 +1,9 @@
+{{/*
+templates/traefik/tls-store.yaml points the Traefik default certificate at this secret, so
+every `tls: {}` IngressRoute in the chart resolves through it. The NLB terminates the public
+ACM certificate and re-encrypts to Traefik without verifying what Traefik presents, which is
+why a private-CA certificate is sufficient here.
+*/}}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -5,8 +11,8 @@ metadata:
   namespace: {{ .Values.namespace }}
 spec:
   secretName: traefik-cert-tls
-  duration: 2160h  # 90 days
-  renewBefore: 360h  # 15 days
+  duration: {{ .Values.tls.internalCa.duration }}
+  renewBefore: {{ .Values.tls.internalCa.renewBefore }}
   subject:
     organizations:
       - Jupyter-k8s
@@ -23,5 +29,48 @@ spec:
     # Uncomment to add additional domains/subdomains
     # - '*.{{ .Values.domain }}'
   issuerRef:
-    name: {{ if .Values.certManager.useStaging }}letsencrypt-staging{{ else }}letsencrypt-prod{{ end }}
-    kind: ClusterIssuer
+    name: internal-ca
+    kind: Issuer
+{{- if .Values.internalTls.enabled }}
+{{/*
+Per-component certificates for the Traefik -> component hops.
+
+Every certificate carries all three name forms on purpose. Traefik reaches these
+components two different ways, and they need different names:
+  - IngressRoute services resolve to POD IPs, so a ServersTransport pins serverName to
+    the FQDN form.
+  - ForwardAuth addresses are URLs, where SNI comes from whatever hostname the URL
+    carries — and the middlewares in this chart use both the short and the FQDN form.
+A certificate with only the FQDN would pass /oauth2/auth and fail every login redirect.
+*/}}
+{{- $ns := .Values.namespace }}
+{{- range $component := list "dex" "oauth2-proxy" }}
+{{- $enabled := ternary $.Values.internalTls.dex $.Values.internalTls.oauth2Proxy (eq $component "dex") }}
+{{- if $enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $component }}-internal-tls
+  namespace: {{ $ns }}
+spec:
+  secretName: {{ $component }}-internal-tls
+  duration: {{ $.Values.tls.internalCa.duration }}
+  renewBefore: {{ $.Values.tls.internalCa.renewBefore }}
+  isCA: false
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  usages:
+    - server auth
+  dnsNames:
+    - {{ $component }}
+    - {{ $component }}.{{ $ns }}
+    - {{ $component }}.{{ $ns }}.svc
+    - {{ $component }}.{{ $ns }}.svc.cluster.local
+  issuerRef:
+    name: internal-ca
+    kind: Issuer
+{{- end }}
+{{- end }}
+{{- end }}
