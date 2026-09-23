@@ -144,7 +144,7 @@ check-aws-oidc-version: ## Fail if local aws-oidc chart version is below the lat
 helm-lint: ## Lint all Helm charts
 	helm lint $(CHART_OIDC) \
 		--set domain=a.fine.example.com \
-		--set certManager.email=admin@example.com \
+		--set tls.acm.certificateArn=arn:aws:acm:us-west-2:123456789012:certificate/00000000-1111-2222-3333-444444444444 \
 		--set storageClass.efs.parameters.fileSystemId=fs-00001111222233334 \
 		--set github.clientId=some-client-id \
 		--set github.clientSecret=some-github-secret \
@@ -173,7 +173,7 @@ helm-test-aws-oidc: ## Render and test aws-oidc chart
 	helm template jk8s /tmp/helm-test-chart --output-dir dist/test-output/aws-oidc \
 		--api-versions keda.sh/v1alpha1 \
 		--set domain=a.fine.example.com \
-		--set certManager.email=admin@example.com \
+		--set tls.acm.certificateArn=arn:aws:acm:us-west-2:123456789012:certificate/00000000-1111-2222-3333-444444444444 \
 		--set storageClass.efs.parameters.fileSystemId=fs-00001111222233334 \
 		--set github.clientId=some-client-id \
 		--set github.clientSecret=some-github-secret \
@@ -284,9 +284,16 @@ kubectl-aws: ## Configure kubectl to use remote cluster
 .PHONY: deploy-aws-oidc
 deploy-aws-oidc: check-aws-oidc-version setup-aws ## Deploy aws-oidc chart (reuses existing Helm values from JD)
 	@echo "Upgrading aws-oidc chart with --reset-then-reuse-values..."
+	# --reset-then-reuse-values re-applies whatever values the release was given, so on a
+	# cluster deployed before ACM it carries forward certManager.email (set by jupyter-deploy's
+	# helm.tf) and tls.mode. The chart rejects both by design, which would fail this target at
+	# render time. Null them here so the target keeps working across the transition; nulling a
+	# key that is already absent is a no-op on a fresh install.
 	helm upgrade jupyter-k8s-aws-oidc $(CHART_OIDC) \
 		-n jupyter-k8s-router \
 		--reset-then-reuse-values \
+		--set certManager=null \
+		--set tls.mode=null \
 		$(HELM_EXTRA_ARGS)
 	@( \
 		set -e; \

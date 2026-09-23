@@ -9,7 +9,8 @@ no plugins. It exercises the k8s-native bearer token path (HMAC JWT via Kubernet
 - An EKS cluster (the OSS chart does not require Pod Identity / IRSA)
 - `.env` file with `AWS_REGION`, `EKS_CLUSTER_NAME`, domain, GitHub OAuth, and EFS values (see `.env.example`)
 - kubectl context pointing at the target cluster
-- A domain with DNS pointing to the cluster (for Traefik ingress + Let's Encrypt)
+- A domain in a Route53 hosted zone, and an ACM certificate for it in the cluster's region (pass the ARN as `tls.acm.certificateArn`)
+It does not require any extra controller: public TLS terminates at an NLB with the ACM certificate and is re-encrypted to Traefik, and the in-tree `cloud-provider-aws` service controller that every EKS cluster already runs does both.
 
 ```bash
 make setup-aws                        # configure kubectl context from .env
@@ -166,7 +167,7 @@ No errors should appear in controller logs.
 | Symptom | Likely cause |
 |---------|-------------|
 | Authmiddleware CrashLoopBackOff | JWT secret not found — check `secretName` matches between auth deployment and rotator |
-| Certificate not issued | cert-manager not installed, or DNS not pointing to cluster |
+| Certificate not issued | cert-manager not installed (the chart mints a private CA for Traefik and the internal hops) |
 | OAuth redirect fails | GitHub OAuth app callback URL mismatch with domain, or Dex configmap has wrong issuer URL |
 | Bearer token returns 403 | `enableBearerAuth` not set to true, or RBAC missing for `bearertokenreviews` |
 | Rotator job fails | ServiceAccount missing RBAC to update the JWT secret |
