@@ -8,9 +8,15 @@ metadata:
     component: auth
 spec:
   ports:
+{{- if and .Values.internalTls.enabled .Values.internalTls.oauth2Proxy }}
+  - name: https
+    port: 4443
+    targetPort: https
+{{- else }}
   - name: http
     port: 4180
     targetPort: http
+{{- end }}
   selector:
     app: oauth2-proxy
     component: auth

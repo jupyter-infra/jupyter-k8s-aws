@@ -39,7 +39,7 @@ spec:
           timeout={{ .Values.oauth2Proxy.dexCheck.timeout_seconds }}  # Timeout in seconds
           counter=0
           interval=5
-          until wget -q --no-check-certificate -O - http://dex.{{ .Values.namespace }}:5556/dex/healthz > /dev/null 2>&1; do
+          until wget -q --no-check-certificate -O - {{ include "defaulter.dexScheme" . }}://dex.{{ .Values.namespace }}:{{ include "defaulter.dexPort" . }}/dex/healthz > /dev/null 2>&1; do
             echo "Dex service is not yet available, retrying in ${interval}s... (${counter}/${timeout}s)"
             sleep $interval
             counter=$((counter + interval))
@@ -62,7 +62,18 @@ spec:
         - --whitelist-domain={{ .Values.domain }}
         - --upstream=static://202
         - --reverse-proxy=true
+{{- if and .Values.internalTls.enabled .Values.internalTls.oauth2Proxy }}
+        # HTTPS only. The default oauth2-proxy image is distroless (no shell), so exec
+        # probes are impossible and the probes below use scheme: HTTPS instead — which
+        # leaves the plaintext listener with nothing to serve, so it is dropped entirely.
+        - --http-address=
+        - --https-address=0.0.0.0:4443
+        - --tls-cert-file=/etc/oauth2-proxy/tls/tls.crt
+        - --tls-key-file=/etc/oauth2-proxy/tls/tls.key
+        - --tls-min-version=TLS1.3
+{{- else }}
         - --http-address=0.0.0.0:4180
+{{- end }}
         - --redirect-url=https://{{ .Values.domain }}/oauth2/callback
         - --oidc-issuer-url=https://{{ .Values.domain }}/dex
         - --cookie-secure=true
@@ -93,18 +104,31 @@ spec:
               name: oauth2-proxy-cookie
               key: cookie-secret
         ports:
+{{- if and .Values.internalTls.enabled .Values.internalTls.oauth2Proxy }}
+        - name: https
+          containerPort: 4443
+{{- else }}
         - name: http
           containerPort: 4180
+{{- end }}
         livenessProbe:
           httpGet:
             path: /ping
-            port: 4180
+            port: {{ include "defaulter.oauth2ProxyPort" . }}
+{{- if and .Values.internalTls.enabled .Values.internalTls.oauth2Proxy }}
+            # kubelet does not verify probe certificates, so HTTPS needs no CA wiring —
+            # but equally, a green probe proves nothing about the CA chain Traefik uses.
+            scheme: HTTPS
+{{- end }}
           initialDelaySeconds: 5
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /ping
-            port: 4180
+            port: {{ include "defaulter.oauth2ProxyPort" . }}
+{{- if and .Values.internalTls.enabled .Values.internalTls.oauth2Proxy }}
+            scheme: HTTPS
+{{- end }}
           initialDelaySeconds: 3
           periodSeconds: 5
         securityContext:
@@ -115,3 +139,15 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: 65532
+{{- if and .Values.internalTls.enabled .Values.internalTls.oauth2Proxy }}
+        volumeMounts:
+        - name: internal-tls
+          mountPath: /etc/oauth2-proxy/tls
+          readOnly: true
+      volumes:
+      - name: internal-tls
+        secret:
+          secretName: oauth2-proxy-internal-tls
+          # The image runs as non-root (65532), so the key must be readable by it.
+          defaultMode: 0444
+{{- end }}

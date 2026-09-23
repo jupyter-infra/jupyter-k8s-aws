@@ -5,7 +5,14 @@ metadata:
   namespace: {{ .Values.namespace }}
 spec:
   forwardAuth:
-    address: http://oauth2-proxy.{{ .Values.namespace }}.svc.cluster.local:4180/oauth2/auth
+    address: {{ include "defaulter.oauth2ProxyScheme" . }}://oauth2-proxy.{{ .Values.namespace }}.svc.cluster.local:{{ include "defaulter.oauth2ProxyPort" . }}/oauth2/auth
+{{- if and .Values.internalTls.enabled .Values.internalTls.oauth2Proxy }}
+    # No serverName here, unlike the IngressRoute path: a ForwardAuth address is a URL, so
+    # it resolves through DNS to the Service ClusterIP and SNI comes from the hostname —
+    # which is why the certificate carries the short, FQDN and bare name forms.
+    tls:
+      caSecret: oauth2-proxy-internal-tls
+{{- end }}
     authResponseHeaders:
       - X-Auth-Request-User
       - X-Auth-Request-Email

@@ -17,8 +17,12 @@ spec:
           namespace: {{ .Values.namespace }}
       services:
         - name: oauth2-proxy
-          port: 4180
+          port: {{ include "defaulter.oauth2ProxyPort" . }}
           namespace: {{ .Values.namespace }}
+{{- if and .Values.internalTls.enabled .Values.internalTls.oauth2Proxy }}
+          scheme: https
+          serversTransport: internal-oauth2-proxy
+{{- end }}
     - match: Host(`{{ .Values.domain }}`) && PathPrefix(`/oauth2/`)
       kind: Rule
       priority: 10
@@ -27,6 +31,10 @@ spec:
           namespace: {{ .Values.namespace }}
       services:
         - name: oauth2-proxy
-          port: 4180
+          port: {{ include "defaulter.oauth2ProxyPort" . }}
           namespace: {{ .Values.namespace }}
+{{- if and .Values.internalTls.enabled .Values.internalTls.oauth2Proxy }}
+          scheme: https
+          serversTransport: internal-oauth2-proxy
+{{- end }}
   tls: {}

@@ -5,7 +5,11 @@ metadata:
   namespace: {{ .Values.namespace }}
 spec:
   forwardAuth:
-    address: http://oauth2-proxy.{{ .Values.namespace }}:4180
+    address: {{ include "defaulter.oauth2ProxyScheme" . }}://oauth2-proxy.{{ .Values.namespace }}:{{ include "defaulter.oauth2ProxyPort" . }}
+{{- if and .Values.internalTls.enabled .Values.internalTls.oauth2Proxy }}
+    tls:
+      caSecret: oauth2-proxy-internal-tls
+{{- end }}
     trustForwardHeader: false
     addAuthCookiesToResponse:
       - "{{ $.Values.authmiddleware.cookieName }}"

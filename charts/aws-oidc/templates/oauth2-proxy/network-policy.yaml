@@ -26,7 +26,7 @@ spec:
         matchLabels:
           kubernetes.io/metadata.name: {{ .Values.namespace }}
     ports:
-    - port: 4180
+    - port: {{ include "defaulter.oauth2ProxyPort" . }}
       protocol: TCP
   egress:
   # Allow DNS resolution
@@ -50,5 +50,5 @@ spec:
         matchLabels:
           kubernetes.io/metadata.name: {{ .Values.namespace }}
     ports:
-    - port: 5556
+    - port: {{ include "defaulter.dexPort" . }}
       protocol: TCP
