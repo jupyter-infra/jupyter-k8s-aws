@@ -34,8 +34,16 @@ tls:
   acm:
     # ARN of the ACM certificate the NLB presents. Required.
     certificateArn: ""
-    # TLS security policy applied to the NLB's TLS listener.
-    sslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    # TLS security policy applied to the NLB's TLS listener. Must not be empty.
+    #
+    # The default negotiates TLS 1.3 and TLS 1.2 only, AEAD ciphers only, and hybrid
+    # post-quantum key exchange (ML-KEM groups alongside the classical curves).
+    #
+    # Unlike ELBSecurityPolicy-TLS13-1-2-2021-06 it carries no CBC ciphers, so a client that
+    # supports neither AES-GCM nor ChaCha20-Poly1305 can no longer connect; current browsers
+    # support both. Override only for such a client, and note that a policy without `PQ` in
+    # its name offers no post-quantum key exchange.
+    sslPolicy: ELBSecurityPolicy-TLS13-1-2-Res-PQ-2025-09
   # Private CA that cert-manager mints in this namespace, used for the Traefik
   # certificate and for every internalTls certificate below. Leaf
   # lifetimes are deliberately long: some upstreams cannot reload a rotated
