@@ -38,7 +38,7 @@ Configures a workspace AccessStrategy for both remote access and WebUI, and rela
 
 **`aws-oidc`**:
 This chart relies on GitHub OIDC to control Workspace access, and DOES NOT need the awsplugin to run as a sidecar of the controller. It deploys:
-- Traefik as router (TLS termination in traefik pod with LetsEncrypt TLS certificates)
+- Traefik as router (public TLS terminates at an AWS NLB with an ACM certificate, re-encrypted to Traefik)
 - Dex as OIDC identity provider for GitHub OAuth authentication
 - OAuth2-proxy for cookies management
 - Authmiddleware for Workspace access control

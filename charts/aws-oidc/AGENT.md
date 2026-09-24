@@ -10,7 +10,9 @@ no plugins. It exercises the k8s-native bearer token path (HMAC JWT via Kubernet
 - `.env` file with `AWS_REGION`, `EKS_CLUSTER_NAME`, domain, GitHub OAuth, and EFS values (see `.env.example`)
 - kubectl context pointing at the target cluster
 - A domain in a Route53 hosted zone, and an ACM certificate for it in the cluster's region (pass the ARN as `tls.acm.certificateArn`)
-It does not require any extra controller: public TLS terminates at an NLB with the ACM certificate and is re-encrypted to Traefik, and the in-tree `cloud-provider-aws` service controller that every EKS cluster already runs does both.
+- **cert-manager installed in the cluster** required. It mints the private CA that issues Traefik's serving certificate, and every `internalTls` certificate.. Verify with `kubectl get certificate -n jupyter-k8s-router` after deploying.
+
+It does not require any extra load balancer controller: public TLS terminates at an NLB with the ACM certificate and is re-encrypted to Traefik, and the in-tree `cloud-provider-aws` service controller that every EKS cluster already runs does both.
 
 ```bash
 make setup-aws                        # configure kubectl context from .env
