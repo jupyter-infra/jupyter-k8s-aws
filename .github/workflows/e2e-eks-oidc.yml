@@ -63,6 +63,9 @@ jobs:
           helm upgrade jupyter-k8s-aws-oidc charts/aws-oidc \
             -n jupyter-k8s-router \
             --reset-then-reuse-values \
+            --set certManager=null \
+            --set tls.mode=null \
+            --set tls.acm.certificateArn=${{ vars.E2E_ACM_CERT_ARN }} \
             --wait --timeout 5m
 
       - name: Verify deployments healthy
