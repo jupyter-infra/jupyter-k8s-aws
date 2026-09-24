@@ -2,6 +2,9 @@ schema_version: 2
 required:
   domain: "${JD_E2E_VAR_DOMAIN}"
   subdomain: "${JD_E2E_VAR_SUBDOMAIN}"
+  # Unused by chart 0.3.0+, but still a `required:` input of the pinned jupyter-deploy
+  # template (variables.yaml, and variables.tf has no default), so `jd config` fails without
+  # it. Remove once jupyter-deploy drops the variable and the pin moves to 0.3.0.
   letsencrypt_email: "${JD_E2E_VAR_EMAIL}"
   oauth_app_client_id: "${JD_E2E_VAR_OAUTH_APP_CLIENT_ID}"
   oauth_allowed_teams: ${JD_E2E_VAR_OAUTH_ALLOWED_TEAMS}

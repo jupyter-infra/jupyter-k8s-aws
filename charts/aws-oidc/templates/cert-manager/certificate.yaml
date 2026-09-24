@@ -35,7 +35,7 @@ spec:
 {{/*
 Per-component certificates for the Traefik -> component hops.
 
-Every certificate carries all three name forms on purpose. Traefik reaches these
+Every certificate carries all four name forms on purpose. Traefik reaches these
 components two different ways, and they need different names:
   - IngressRoute services resolve to POD IPs, so a ServersTransport pins serverName to
     the FQDN form.

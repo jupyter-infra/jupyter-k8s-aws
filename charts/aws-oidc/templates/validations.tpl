@@ -13,8 +13,21 @@
 {{- end }}
 {{- end }}
 
+{{/* The whole edge depends on this one value, and a wrong one fails only as a Service event
+     minutes later when the provider cannot create the TLS listener. Shape-check it here.
+     The partition is matched loosely (aws, aws-cn, aws-us-gov, aws-iso*) so the guard does not
+     have to be revised for a new partition. */}}
 {{- if not .Values.tls.acm.certificateArn }}
 {{- fail "tls.acm.certificateArn is required" }}
+{{- end }}
+{{- if not (regexMatch "^arn:aws[a-z-]*:acm:[a-z0-9-]+:[0-9]{12}:certificate/[a-zA-Z0-9-]+$" .Values.tls.acm.certificateArn) }}
+{{- fail (printf "tls.acm.certificateArn must be an ACM certificate ARN (arn:<partition>:acm:<region>:<account>:certificate/<id>), got %q" .Values.tls.acm.certificateArn) }}
+{{- end }}
+
+{{/* The default pins a TLS 1.2 minimum. An empty value still renders the annotation, and the
+     provider then passes SslPolicy: "" through to a listener creation that errors out. */}}
+{{- if not .Values.tls.acm.sslPolicy }}
+{{- fail "tls.acm.sslPolicy must not be empty — it sets the NLB listener's TLS security policy" }}
 {{- end }}
 
 {{/* Guard the removed Let's Encrypt keys explicitly. With --reset-then-reuse-values a stored
@@ -34,6 +47,25 @@
 {{- end }}
 {{- if and .Values.internalTls.enabled .Values.internalTls.webApp }}
 {{- fail "internalTls.webApp is not supported yet — the jupyter-k8s-ui image cannot serve TLS (see jupyter-infra/jupyter-k8s-ui#71)" }}
+{{- end }}
+
+{{/* Validate: the nodes the NLB targets must be able to run Traefik. targetNodeLabels selects
+     which nodes join the target group; the effective node selector decides where Traefik pods
+     land. Labelling the NLB for one tier while pinning Traefik to another yields a target group
+     that can never pass a health check — a total edge outage with no render and no apply error.
+     Only checked when both are set: an empty targetNodeLabels registers every node, and an empty
+     selector lets Traefik run anywhere. */}}
+{{- if .Values.traefik.targetNodeLabels }}
+{{- $selector := .Values.traefik.nodeSelector | default .Values.nodeSelector }}
+{{- if $selector }}
+{{- range $k, $v := .Values.traefik.targetNodeLabels }}
+{{- if not (hasKey $selector $k) }}
+{{- fail (printf "traefik.targetNodeLabels has %q, which the effective Traefik node selector does not constrain — the NLB would target nodes that cannot run Traefik" $k) }}
+{{- else if ne (get $selector $k | toString) ($v | toString) }}
+{{- fail (printf "traefik.targetNodeLabels %s=%v conflicts with the Traefik node selector %s=%v — the NLB would target nodes that cannot run Traefik" $k $v $k (get $selector $k)) }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end }}
 
 {{- if not .Values.github.clientId }}

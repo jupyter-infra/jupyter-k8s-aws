@@ -186,12 +186,92 @@ var _ = Describe("Edge TLS", func() {
 				`aws-load-balancer-target-node-labels: "aaa=first,zzz=last"`))
 		})
 
+		// A target group whose labels match no node Traefik can run on never passes a health
+		// check — a total edge outage with no render and no apply error.
+		It("rejects labels the Traefik node selector does not satisfy", func() {
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+
+			for _, tc := range []struct{ name, sel, want string }{
+				{"key absent from selector", "nodeSelector.other=x", "does not constrain"},
+				{"value conflicts", "nodeSelector.tier=workspaces", "conflicts with"},
+			} {
+				args := append([]string{helmTemplateCmd, helmReleaseName, chartDir}, oidcRequiredArgs()...)
+				args = append(args, helmSetFlag, "traefik.targetNodeLabels.tier=routing", helmSetFlag, tc.sel)
+				out, err := exec.Command("helm", args...).CombinedOutput()
+				Expect(err).To(HaveOccurred(), "%s: expected rejection, got:\n%s", tc.name, string(out))
+				Expect(string(out)).To(ContainSubstring(tc.want), tc.name)
+			}
+		})
+
+		It("accepts labels the selector satisfies, and skips the check when the selector is empty", func() {
+			consistent := renderTLS(
+				helmSetFlag, "traefik.targetNodeLabels.tier=routing",
+				helmSetFlag, "nodeSelector.tier=routing",
+			)
+			Expect(readFile(consistent, "traefik/service.yaml")).To(ContainSubstring(`target-node-labels: "tier=routing"`))
+
+			// No selector at all: Traefik can run anywhere, so any target labels are fine.
+			unconstrained := renderTLS(helmSetFlag, "traefik.targetNodeLabels.tier=routing")
+			Expect(readFile(unconstrained, "traefik/service.yaml")).To(ContainSubstring(`target-node-labels: "tier=routing"`))
+		})
+
 		It("renders a slash-bearing label key as-is", func() {
 			// jupyter-deploy uses jupyter-deploy/role=routing; --set treats "." as a path
 			// separator, so this is also the escaping the deployment has to write.
 			dir := renderTLS(helmSetFlag, `traefik.targetNodeLabels.jupyter-deploy/role=routing`)
 			Expect(readFile(dir, "traefik/service.yaml")).To(ContainSubstring(
 				`aws-load-balancer-target-node-labels: "jupyter-deploy/role=routing"`))
+		})
+	})
+
+	Context("certificate ARN shape", func() {
+		const arnFlag = "tls.acm.certificateArn="
+
+		// A wrong ARN renders cleanly and only surfaces as a Service event once the provider
+		// fails to create the TLS listener, so the shape is checked at render time. The guard
+		// matches the partition loosely; these cases pin that it stays loose enough.
+		It("accepts every AWS partition", func() {
+			for _, arn := range []string{
+				"arn:aws:acm:us-west-2:123456789012:certificate/3174825c-a47e-45f3-a705-acc18accb706",
+				"arn:aws-cn:acm:cn-north-1:123456789012:certificate/3174825c-a47e-45f3-a705-acc18accb706",
+				"arn:aws-us-gov:acm:us-gov-west-1:123456789012:certificate/abc-123",
+				"arn:aws-iso-b:acm:us-isob-east-1:123456789012:certificate/abc-123",
+			} {
+				dir := renderTLS(helmSetFlag, arnFlag+arn)
+				Expect(readFile(dir, "traefik/service.yaml")).To(ContainSubstring(arn), arn)
+			}
+		})
+
+		It("rejects malformed ARNs", func() {
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+
+			for _, arn := range []string{
+				"not-an-arn",
+				"arn:aws:iam::123456789012:certificate/abc",           // wrong service
+				"arn:aws:acm:us-west-2::certificate/abc",              // no account
+				"arn:aws:acm:us-west-2:12345:certificate/abc",         // short account
+				"arn:aws:acm:us-west-2:123456789012:certificate/",     // no id
+				"arn:aws:acm::123456789012:certificate/abc",           // no region
+				"arn:aws:acm:us-west-2:123456789012:distribution/abc", // wrong resource
+			} {
+				args := append([]string{helmTemplateCmd, helmReleaseName, chartDir}, oidcRequiredArgs()...)
+				args = append(args, helmSetFlag, arnFlag+arn)
+				out, err := exec.Command("helm", args...).CombinedOutput()
+				Expect(err).To(HaveOccurred(), "expected %q to be rejected, got:\n%s", arn, string(out))
+				Expect(string(out)).To(ContainSubstring("must be an ACM certificate ARN"), arn)
+			}
+		})
+
+		It("rejects an empty sslPolicy, which would render an unusable listener", func() {
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+			args := append([]string{helmTemplateCmd, helmReleaseName, chartDir}, oidcRequiredArgs()...)
+			args = append(args, helmSetFlag, "tls.acm.sslPolicy=")
+			out, err := exec.Command("helm", args...).CombinedOutput()
+			Expect(err).To(HaveOccurred(), "expected empty sslPolicy to be rejected, got:\n%s", string(out))
+			Expect(string(out)).To(ContainSubstring("tls.acm.sslPolicy must not be empty"))
 		})
 	})
 

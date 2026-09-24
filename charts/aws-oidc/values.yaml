@@ -117,15 +117,17 @@ traefik:
   # Empty ({}) registers EVERY node in the cluster, which is the Kubernetes default.
   #
   # NLB targets are node instances on the Service NodePort, not pods, so without this
-  # every node — including workspace nodes that never run Traefik — sits in the target
-  # group and forwards through kube-proxy. Restricting to the routing tier keeps the
-  # target group small and every hop on nodes provisioned for it. Example:
+  # every node — including nodes that never run Traefik — sits in the target group and
+  # forwards through kube-proxy. Restricting to the router tier keeps the target group
+  # small and every hop on nodes provisioned for it. Example:
   #
   #   targetNodeLabels:
-  #     jupyter-deploy/role: routing
+  #     <label-key>: <label-value>
   #
-  # All pairs must match (AND). Keep this consistent with traefik.nodeSelector below:
-  # if the selected nodes cannot run Traefik pods, every target fails its health check.
+  # All pairs must match (AND). Must be consistent with the effective Traefik node
+  # selector (traefik.nodeSelector, else the chart-level nodeSelector) — the chart rejects
+  # a combination that would target nodes Traefik cannot run on, since that yields a
+  # target group which never passes a health check.
   targetNodeLabels: {}
   # Redirect HTTP to HTTPS
   redirectHttp: true
