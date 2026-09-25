@@ -89,9 +89,14 @@
 {{- fail "accessStrategy.createBearer requires authmiddleware.enableBearerAuth to be true" }}
 {{- end }}
 
-{{/* Validate: websocket access strategy requires enableBearerAuth */}}
-{{- if and .Values.accessStrategy.createWebSocket (not .Values.authmiddleware.enableBearerAuth) }}
-{{- fail "accessStrategy.createWebSocket requires authmiddleware.enableBearerAuth to be true" }}
+{{/* Validate: the /ssh-ws route is guarded by the bearer-auth ForwardAuth handler */}}
+{{- if and .Values.accessStrategy.webSocket.enabled (not .Values.authmiddleware.enableBearerAuth) }}
+{{- fail "accessStrategy.webSocket.enabled requires authmiddleware.enableBearerAuth to be true" }}
+{{- end }}
+
+{{/* Validate: WebSocket is a transport on a strategy, so at least one must exist */}}
+{{- if and .Values.accessStrategy.webSocket.enabled (not (or .Values.accessStrategy.createOAuth .Values.accessStrategy.createBearer)) }}
+{{- fail "accessStrategy.webSocket.enabled requires accessStrategy.createOAuth or accessStrategy.createBearer" }}
 {{- end }}
 
 {{/* Validate: additionalNamespaces must not include the default workspace namespace (it is added automatically) */}}

@@ -239,12 +239,15 @@ accessStrategy:
   createOAuth: true
   # Create the bearer token access strategy (requires authmiddleware.enableBearerAuth)
   createBearer: false
-  # Create the WebSocket access strategy for remote IDE access over WebSocket.
-  # Requires authmiddleware.enableBearerAuth: the WebSocket upgrade is authenticated
-  # by the bearer-auth ForwardAuth handler using the JWT from the Authorization header.
-  createWebSocket: false
-  # WebSocket remote access (ws-proxy sidecar) settings
+  # Remote IDE access over SSH-in-WebSocket. This is a transport added to the
+  # strategies above, not a strategy of its own, so a workspace already using
+  # OAuth or bearer access gains it without changing which strategy it references.
   webSocket:
+    # Requires authmiddleware.enableBearerAuth: the WebSocket upgrade is
+    # authenticated by the bearer-auth ForwardAuth handler using the JWT from the
+    # Authorization header. Also requires the workspace image to embed the remote
+    # access server, which is what listens on targetPort.
+    enabled: false
     # Container and port name for the proxy sidecar. The port name is what
     # podModifications.exposedPorts references to publish it on the workspace Service.
     containerName: ws-proxy
@@ -258,11 +261,29 @@ accessStrategy:
     maxSessionDuration: "12h"
     # Maximum concurrent WebSocket connections per workspace
     maxConnections: 10
+    # Largest inbound WebSocket message accepted, in bytes. SSH frames are small,
+    # so raise this only if a client reports oversized-message closures.
+    readLimit: 65536
+    # Keepalive cadence and dead-peer timeout. pingInterval must stay below
+    # pingTimeout, and both below any idle timeout on the ingress in front of
+    # the proxy, or a session with no keystrokes is dropped mid-connection.
+    pingInterval: "30s"
+    pingTimeout: "60s"
+    # How often the sidecar probes the remote access server. The result is
+    # reported on /health/target and published as ws_proxy_target_reachable.
+    targetHealthInterval: "30s"
+    # Where the remote access server persists its host key, set on the workspace
+    # container. Leave empty to use the server's own default of
+    # $HOME/.ssh/ssh_host_ed25519_key, which is on the primary storage volume for
+    # images whose home directory is the mount path. Set it explicitly when the
+    # image's home directory is not on persistent storage, otherwise every
+    # reconnect reports a changed host key.
+    hostKeyPath: ""
     image:
       imagePullPolicy: Always
       repository: ghcr.io/jupyter-infra
       imageName: workspace-websocket-proxy
-      imageTag: v0.1.0-rc.1
+      imageTag: v0.1.0-rc.2
     resources:
       limits:
         cpu: 200m

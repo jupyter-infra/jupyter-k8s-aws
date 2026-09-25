@@ -6,6 +6,9 @@ metadata:
   namespace: {{ .Values.accessStrategy.namespace }}
 spec:
   displayName: JupyterLab Routing Strategy with GitHub authentication
+  {{- if .Values.accessStrategy.webSocket.enabled }}
+  createConnectionHandler: "k8s-native"
+  {{- end }}
   accessResourceTemplates:
     {{- if .Values.accessStrategy.createNetworkPolicy }}
     - kind: NetworkPolicy
@@ -30,6 +33,9 @@ spec:
             ports:
             - port: 8888
               protocol: TCP
+            {{- if .Values.accessStrategy.webSocket.enabled }}
+            {{- include "awsOidc.webSocket.netpolPort" . | nindent 12 }}
+            {{- end }}
           - from:
             - namespaceSelector:
                 matchLabels:
@@ -37,6 +43,9 @@ spec:
             ports:
             - port: 8888
               protocol: TCP
+            {{- if .Values.accessStrategy.webSocket.enabled }}
+            {{- include "awsOidc.webSocket.netpolPort" . | nindent 12 }}
+            {{- end }}
     {{- end }}
     - kind: IngressRoute
       apiVersion: traefik.io/v1alpha1
@@ -86,14 +95,31 @@ spec:
                 - name: "{{`{{ .Service.Name }}`}}"
                   namespace: "{{`{{ .Service.Namespace }}`}}"
                   port: 8888
+    {{- if .Values.accessStrategy.webSocket.enabled }}
+    {{- include "awsOidc.webSocket.ingressRoute" . | nindent 4 }}
+    {{- end }}
   deploymentModifications:
     podModifications:
+      {{- if .Values.accessStrategy.webSocket.enabled }}
+      {{- include "awsOidc.webSocket.podModifications" . | nindent 6 }}
+      {{- end }}
       primaryContainerModifications:
         mergeEnv:
           - name: JUPYTER_BASE_URL
             valueTemplate: "/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/"
+          {{- if .Values.accessStrategy.webSocket.enabled }}
+          - name: REMOTE_ACCESS_AUTOSTART
+            valueTemplate: "true"
+          {{- end }}
+          {{- if and .Values.accessStrategy.webSocket.enabled .Values.accessStrategy.webSocket.hostKeyPath }}
+          - name: SSH_HOST_KEY_PATH
+            valueTemplate: {{ .Values.accessStrategy.webSocket.hostKeyPath | quote }}
+          {{- end }}
   applicationBasePathTemplate: "/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/"
   accessURLTemplate: "https://{{ .Values.domain }}/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/auth"
+  {{- if .Values.accessStrategy.webSocket.enabled }}
+  webSocketURLTemplate: "https://{{ .Values.domain }}/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/ssh-ws"
+  {{- end }}
   accessStartupProbe:
     httpGet:
       urlTemplate: "https://{{ .Values.domain }}/workspaces/{{`{{ .Workspace.Namespace }}`}}/{{`{{ .Workspace.Name }}`}}/auth"
