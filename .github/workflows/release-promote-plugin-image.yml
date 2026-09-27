@@ -1,5 +1,10 @@
 name: "Release: Promote Plugin Image"
 
+# Deliberately NOT workflow_dispatch: this job publishes to the production registry.
+# Reachable only via release-plugin.yml, so the validate job (semver, tag uniqueness,
+# branch check) always runs in front of a production push. Use
+# release-stage-plugin-image.yml directly if you need to iterate on a single step —
+# staging is safe to dirty.
 on:
   workflow_call:
     inputs:
@@ -9,14 +14,6 @@ on:
       short_sha:
         required: true
         type: string
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Image tag to promote (e.g. v0.1.0)'
-        required: true
-      short_sha:
-        description: 'Short SHA tag to promote'
-        required: true
 
 env:
   STAGING_REGISTRY: ghcr.io/jupyter-infra/staging
