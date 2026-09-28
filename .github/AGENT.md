@@ -8,9 +8,15 @@
 | `release-plugin.yml` | `workflow_dispatch` | Orchestrator: stage → promote → release (aws-plugin image) |
 | `release-chart.yml` | `workflow_dispatch` | Orchestrator: stage → promote → release (either chart) |
 | `release-stage-plugin-image.yml` | `workflow_call` / `workflow_dispatch` | Build multi-arch image, push to staging GHCR |
-| `release-promote-plugin-image.yml` | `workflow_call` / `workflow_dispatch` | Promote image: crane copy staging → production |
+| `release-promote-plugin-image.yml` | `workflow_call` **only** | Promote image: crane copy staging → production |
 | `release-stage-chart.yml` | `workflow_call` / `workflow_dispatch` | Package chart, push OCI to staging GHCR |
-| `release-promote-chart.yml` | `workflow_call` / `workflow_dispatch` | Promote chart: helm pull staging, push production |
+| `release-promote-chart.yml` | `workflow_call` **only** | Promote chart: helm pull staging, push production |
+
+The two **promote** workflows are `workflow_call` only, on purpose: they publish to the
+production registry, so they must not be reachable from the Actions UI. Going through the
+orchestrator is what guarantees `validate` (semver, tag uniqueness, branch check) runs
+first and that the `release` job records a git tag and GitHub Release afterwards. The
+**stage** workflows keep `workflow_dispatch` — staging is safe to dirty.
 
 ## Artifacts (independently versioned)
 
@@ -73,8 +79,9 @@ jobs:
 ```
 
 - Use pre-release versions (e.g. `v0.1.0-rc.1`) to avoid colliding with real releases.
-- Each sub-workflow supports both `workflow_call` and `workflow_dispatch`, so after merging
-  you can trigger each step individually from the Actions UI.
+- The **stage** sub-workflows support both `workflow_call` and `workflow_dispatch`, so after
+  merging you can trigger them individually from the Actions UI. The **promote** ones do not
+  — run the orchestrator instead.
 - Remove test workflows before merging to main.
 
 ## Registries
