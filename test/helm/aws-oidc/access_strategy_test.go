@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -322,19 +323,34 @@ var _ = Describe("Access Strategy", func() {
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
 			args := append(minimalOIDCArgs,
-				helmSetFlag, "accessStrategy.createWebSocket=true",
+				helmSetFlag, "accessStrategy.webSocket.enabled=true",
 				helmSetFlag, "authmiddleware.enableBearerAuth=true",
 			)
 			helmTemplate(chartDir, outputDir, args...)
 			data, err := os.ReadFile(filepath.Join(outputDir,
-				"jupyter-k8s-aws-oidc/templates", websocketStrategyFile))
+				"jupyter-k8s-aws-oidc/templates", oauthStrategyFile))
 			Expect(err).NotTo(HaveOccurred())
 			content = string(data)
 		})
 
-		It("should render the websocket access strategy", func() {
-			Expect(content).To(ContainSubstring("name: websocket-access-strategy"))
-			Expect(content).To(ContainSubstring("createConnectionHandler: \"k8s-native\""))
+		It("should add the transport to the OAuth strategy rather than create its own", func() {
+			Expect(content).To(ContainSubstring("name: oauth-access-strategy"))
+			Expect(content).To(ContainSubstring("createConnectionHandler: \"k8s-native\""),
+				"the Extension API needs a handler to mint the WebSocket connection URL")
+		})
+
+		It("should keep the GitHub OAuth browser flow intact", func() {
+			Expect(content).To(ContainSubstring("namePrefix: unauthorized-route"))
+			Expect(content).To(ContainSubstring("name: authmiddleware-auth"))
+			Expect(content).To(ContainSubstring("/auth`)"))
+			Expect(content).To(ContainSubstring(
+				"accessURLTemplate: \"https://test.example.com/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/auth\""))
+		})
+
+		It("should leave workspace readiness gated on the application, not the tunnel", func() {
+			probe := content[strings.Index(content, "accessStartupProbe:"):]
+			Expect(probe).To(ContainSubstring("/auth\""))
+			Expect(probe).NotTo(ContainSubstring("/ssh-ws\""))
 		})
 
 		It("should route the /ssh-ws sub-path to the proxy port without matching all WebSocket traffic", func() {
@@ -345,9 +361,6 @@ var _ = Describe("Access Strategy", func() {
 			Expect(content).To(ContainSubstring(
 				"webSocketURLTemplate: \"https://test.example.com/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/ssh-ws\""),
 				"webSocketURLTemplate must resolve the client to the /ssh-ws route")
-			Expect(content).To(ContainSubstring(
-				"bearerAuthURLTemplate: \"https://test.example.com/workspaces/{{ .Workspace.Namespace }}/{{ .Workspace.Name }}/bearer-auth\""),
-				"bearerAuthURLTemplate must resolve the browser web-UI to /bearer-auth")
 		})
 
 		It("should open both the application port and the proxy port in the NetworkPolicy", func() {
@@ -367,10 +380,44 @@ var _ = Describe("Access Strategy", func() {
 			Expect(content).To(ContainSubstring("allowPrivilegeEscalation: false"))
 			Expect(content).To(ContainSubstring("readOnlyRootFilesystem: true"))
 		})
+
+		It("should expose the keepalive, read limit and probe interval as env", func() {
+			Expect(content).To(ContainSubstring("name: READ_LIMIT"))
+			Expect(content).To(ContainSubstring("name: PING_INTERVAL"))
+			Expect(content).To(ContainSubstring("name: PING_TIMEOUT"))
+			Expect(content).To(ContainSubstring("name: TARGET_HEALTH_INTERVAL"))
+		})
+
+		It("should leave the host key path to the server's default", func() {
+			Expect(content).NotTo(ContainSubstring("SSH_HOST_KEY_PATH"),
+				"an unset hostKeyPath must not pin a path that may sit outside the storage volume")
+		})
+	})
+
+	Context("with a host key path configured", func() {
+		It("should set SSH_HOST_KEY_PATH on the workspace container, not the sidecar", func() {
+			outputDir := GinkgoT().TempDir()
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+			args := append(minimalOIDCArgs,
+				helmSetFlag, "accessStrategy.webSocket.enabled=true",
+				helmSetFlag, "authmiddleware.enableBearerAuth=true",
+				helmSetFlag, "accessStrategy.webSocket.hostKeyPath=/home/jovyan/.ssh/host_key",
+			)
+			helmTemplate(chartDir, outputDir, args...)
+			data, err := os.ReadFile(filepath.Join(outputDir,
+				"jupyter-k8s-aws-oidc/templates", oauthStrategyFile))
+			Expect(err).NotTo(HaveOccurred())
+			content := string(data)
+
+			primary := content[strings.Index(content, "primaryContainerModifications:"):]
+			Expect(primary).To(ContainSubstring("name: SSH_HOST_KEY_PATH"))
+			Expect(primary).To(ContainSubstring("/home/jovyan/.ssh/host_key"))
+		})
 	})
 
 	Context("websocket validation", func() {
-		It("should fail when createWebSocket is true but enableBearerAuth is false", func() {
+		It("should fail when the transport is on but enableBearerAuth is false", func() {
 			outputDir := GinkgoT().TempDir()
 			chartDir := GinkgoT().TempDir()
 			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
@@ -382,13 +429,35 @@ var _ = Describe("Access Strategy", func() {
 				minimalOIDCArgs[:]...,
 			)
 			args = append(args,
-				helmSetFlag, "accessStrategy.createWebSocket=true",
+				helmSetFlag, "accessStrategy.webSocket.enabled=true",
 				helmSetFlag, "authmiddleware.enableBearerAuth=false",
 			)
 			out, err = exec.Command("helm", args...).CombinedOutput()
 			Expect(err).To(HaveOccurred(), "helm template should have failed")
 			Expect(string(out)).To(ContainSubstring(
-				"accessStrategy.createWebSocket requires authmiddleware.enableBearerAuth"))
+				"accessStrategy.webSocket.enabled requires authmiddleware.enableBearerAuth"))
+		})
+
+		It("should fail when the transport is on but no strategy carries it", func() {
+			outputDir := GinkgoT().TempDir()
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+
+			out, err := exec.Command("helm", "dependency", "build", chartDir).CombinedOutput()
+			Expect(err).NotTo(HaveOccurred(), "helm dependency build failed: %s", string(out))
+
+			args := append([]string{helmTemplateCmd, helmReleaseName, chartDir, helmOutputDirFlag, outputDir},
+				minimalOIDCArgs[:]...,
+			)
+			args = append(args,
+				helmSetFlag, "accessStrategy.createOAuth=false",
+				helmSetFlag, "accessStrategy.webSocket.enabled=true",
+				helmSetFlag, "authmiddleware.enableBearerAuth=true",
+			)
+			out, err = exec.Command("helm", args...).CombinedOutput()
+			Expect(err).To(HaveOccurred(), "helm template should have failed")
+			Expect(string(out)).To(ContainSubstring(
+				"accessStrategy.webSocket.enabled requires accessStrategy.createOAuth or accessStrategy.createBearer"))
 		})
 	})
 })

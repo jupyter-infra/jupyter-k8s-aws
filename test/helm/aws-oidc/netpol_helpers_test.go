@@ -24,9 +24,8 @@ const (
 	oauth2ProxyDeployFile    = "oauth2-proxy/deployment.yaml"
 	authmiddlewareDeployFile = "authmiddleware/deployment.yaml"
 
-	oauthStrategyFile     = "access-strategy/oauth-access-strategy.yaml"
-	bearerStrategyFile    = "access-strategy/bearer-access-strategy.yaml"
-	websocketStrategyFile = "access-strategy/websocket-access-strategy.yaml"
+	oauthStrategyFile  = "access-strategy/oauth-access-strategy.yaml"
+	bearerStrategyFile = "access-strategy/bearer-access-strategy.yaml"
 
 	// roleLabelKey is the node label / taint key used in nodeSelector and
 	// toleration test fixtures.
