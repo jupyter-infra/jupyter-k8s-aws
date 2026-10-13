@@ -81,6 +81,23 @@ storageClass:
     parameters:
       type: gp3
       fsType: ext4
+    # Extra AWS tags for the EBS volumes this class provisions, given as key/value pairs.
+    # Rendered as tagSpecification_<n> parameters. Empty ({}) leaves only the driver's own
+    # tags, which a consumer's tag-based cleanup or cost attribution cannot match. Example:
+    #
+    #   additionalResourceTags:
+    #     <tag-key>: <tag-value>
+    #
+    # Values may use the driver's placeholders, e.g. "{{ .PVCNamespace }}" (requires
+    # --extra-create-metadata on the external-provisioner). Keys must not contain "=", and
+    # CSIVolumeName, CSIVolumeSnapshotName and the kubernetes.io / <provisioner>/ prefixes
+    # are reserved by the driver. Do not also set tagSpecification* keys in parameters.
+    #
+    # Applies to new volumes only. StorageClass parameters are immutable, so changing this
+    # on a live release fails helm upgrade until the StorageClass is deleted (existing
+    # volumes are unaffected). EFS has no equivalent: its driver tags access points only
+    # through its own --tags flag.
+    additionalResourceTags: {}
   efs:
     create: false
     name: efs-sc

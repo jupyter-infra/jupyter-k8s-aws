@@ -12,7 +12,14 @@ metadata:
   {{- end }}
 provisioner: {{ .Values.storageClass.ebs.provisioner }}
 parameters:
-  {{- toYaml .Values.storageClass.ebs.parameters | nindent 2 }}
+  {{- with .Values.storageClass.ebs.parameters }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- /* Sorted so the numbering, and with it the immutable parameters, is stable across upgrades. */}}
+  {{- $tags := .Values.storageClass.ebs.additionalResourceTags }}
+  {{- range $i, $k := keys $tags | sortAlpha }}
+  tagSpecification_{{ add1 $i }}: {{ printf "%s=%s" $k (get $tags $k | toString) | quote }}
+  {{- end }}
 reclaimPolicy: {{ .Values.storageClass.ebs.reclaimPolicy }}
 volumeBindingMode: {{ .Values.storageClass.ebs.volumeBindingMode }}
 ---

@@ -76,6 +76,27 @@
 {{- end }}
 {{- end }}
 
+{{/* Validate: EBS tags the driver would reject. It splits each tagSpecification on the first
+     "=" and refuses its reserved keys at CreateVolume, which leaves the PVC Pending with no
+     render or apply error. Explicit tagSpecification* parameters would collide with the
+     rendered ones. */}}
+{{- if and .Values.storageClass.ebs.create .Values.storageClass.ebs.additionalResourceTags }}
+{{- $driverPrefix := printf "%s/" .Values.storageClass.ebs.provisioner }}
+{{- range $k, $v := .Values.storageClass.ebs.additionalResourceTags }}
+{{- if contains "=" $k }}
+{{- fail (printf "storageClass.ebs.additionalResourceTags key %q contains \"=\", which the EBS CSI driver uses as the key/value separator" $k) }}
+{{- end }}
+{{- if or (has $k (list "CSIVolumeName" "CSIVolumeSnapshotName")) (hasPrefix "kubernetes.io" $k) (hasPrefix $driverPrefix $k) }}
+{{- fail (printf "storageClass.ebs.additionalResourceTags key %q is reserved by the EBS CSI driver (CSIVolumeName, CSIVolumeSnapshotName, kubernetes.io*, %s*)" $k $driverPrefix) }}
+{{- end }}
+{{- end }}
+{{- range $k, $_ := .Values.storageClass.ebs.parameters }}
+{{- if hasPrefix "tagSpecification" $k }}
+{{- fail (printf "storageClass.ebs.parameters.%s conflicts with storageClass.ebs.additionalResourceTags — set tags in one place only" $k) }}
+{{- end }}
+{{- end }}
+{{- end }}
+
 {{- if not .Values.github.clientId }}
 {{- fail "github.clientId is required" }}
 {{- end }}
