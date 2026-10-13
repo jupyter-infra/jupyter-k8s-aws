@@ -6,15 +6,87 @@ Distributed under the terms of the MIT license
 package aws_oidc_test
 
 import (
+	"os"
 	"path/filepath"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
 )
 
+const dexConfigChecksumKey = "checksum/config"
+
+// renderDexConfigChecksum renders the chart and returns the dex pod template's
+// config checksum annotation. It pins dex.oauth2ProxyClientSecret: left unset,
+// the chart generates a fresh one per render, so the checksum would never match.
+func renderDexConfigChecksum(rootDir string, extraArgs ...string) string {
+	outputDir := GinkgoT().TempDir()
+	chartDir := GinkgoT().TempDir()
+	copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+
+	args := append(oidcRequiredArgs(), helmSetFlag, "dex.oauth2ProxyClientSecret=pinned")
+	helmTemplate(chartDir, outputDir, append(args, extraArgs...)...)
+	data, err := os.ReadFile(filepath.Join(outputDir, "jupyter-k8s-aws-oidc/templates/dex/deployment.yaml"))
+	Expect(err).NotTo(HaveOccurred())
+
+	var dep appsv1.Deployment
+	Expect(yaml.Unmarshal(data, &dep)).To(Succeed())
+	Expect(dep.Spec.Template.Annotations).To(HaveKey(dexConfigChecksumKey))
+	return dep.Spec.Template.Annotations[dexConfigChecksumKey]
+}
+
 var _ = Describe("Dex", func() {
+	// Regression guard for #100: dex reads its config only at startup, so a
+	// config change must alter the pod template or helm upgrade never rolls dex.
+	Context("config checksum", func() {
+		var rootDir, baseline string
+
+		BeforeEach(func() {
+			var err error
+			rootDir, err = filepath.Abs("../../..")
+			Expect(err).NotTo(HaveOccurred())
+			baseline = renderDexConfigChecksum(rootDir)
+		})
+
+		It("should be a sha256 hex digest", func() {
+			Expect(baseline).To(MatchRegexp(`^[0-9a-f]{64}$`))
+		})
+
+		It("should be stable across renders with the same values", func() {
+			Expect(renderDexConfigChecksum(rootDir)).To(Equal(baseline))
+		})
+
+		It("should change when a team is added to github.orgs", func() {
+			Expect(renderDexConfigChecksum(rootDir,
+				helmSetFlag, "github.orgs[0].teams[1]=t2",
+			)).NotTo(Equal(baseline))
+		})
+
+		It("should change when an org is added to github.orgs", func() {
+			Expect(renderDexConfigChecksum(rootDir,
+				helmSetFlag, "github.orgs[1].name=org2",
+				helmSetFlag, "github.orgs[1].teams[0]=t",
+			)).NotTo(Equal(baseline))
+		})
+
+		// oauth2-proxy rolls on a client secret change (it is a container arg), so
+		// dex must roll with it or the token exchange fails on the stale secret.
+		It("should change when the oauth2-proxy client secret changes", func() {
+			Expect(renderDexConfigChecksum(rootDir,
+				helmSetFlag, "dex.oauth2ProxyClientSecret=rotated",
+			)).NotTo(Equal(baseline))
+		})
+
+		It("should not change when only a non-dex value changes", func() {
+			Expect(renderDexConfigChecksum(rootDir,
+				helmSetFlag, "githubRbac.orgs[0].teams[1]=t2",
+			)).To(Equal(baseline))
+		})
+	})
+
 	Context("network policy", func() {
 		var np networkingv1.NetworkPolicy
 

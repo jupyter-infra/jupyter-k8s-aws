@@ -17,6 +17,9 @@ spec:
       labels:
         app: dex
         component: oauth
+      annotations:
+        # Dex reads its config only at startup: roll the pods whenever it changes.
+        checksum/config: {{ include (print $.Template.BasePath "/dex/configmap.yaml") . | sha256sum }}
     spec:
       serviceAccountName: dex
       {{- with .Values.dex.nodeSelector | default .Values.nodeSelector }}
