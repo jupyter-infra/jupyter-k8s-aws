@@ -33,6 +33,10 @@ metadata:
     # Register only the routing tier as NLB targets instead of every node. See values.yaml.
     service.beta.kubernetes.io/aws-load-balancer-target-node-labels: {{ include "traefik.keyValueList" . | quote }}
     {{- end }}
+    {{- with .Values.traefik.additionalResourceTags }}
+    # Consumer tags for the NLB, its target groups and its security group. See values.yaml.
+    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: {{ include "traefik.keyValueList" . | quote }}
+    {{- end }}
     # No healthcheck-* annotations on purpose. Targets are node instances on the
     # NodePort, not pods, so Traefik's /ping on port 9000 is not reachable from the NLB
     # (it has no NodePort) and an HTTP check against the traffic port would fail against

@@ -68,6 +68,14 @@
 {{- end }}
 {{- end }}
 
+{{/* Validate: the in-tree controller parses additional-resource-tags by splitting on "," then
+     "=", so a separator inside a key or value is silently split or truncated into wrong tags. */}}
+{{- range $k, $v := .Values.traefik.additionalResourceTags }}
+{{- if or (contains "," $k) (contains "=" $k) (contains "," ($v | toString)) (contains "=" ($v | toString)) }}
+{{- fail (printf "traefik.additionalResourceTags %s=%v contains \",\" or \"=\", which the load balancer annotation uses as separators" $k $v) }}
+{{- end }}
+{{- end }}
+
 {{- if not .Values.github.clientId }}
 {{- fail "github.clientId is required" }}
 {{- end }}

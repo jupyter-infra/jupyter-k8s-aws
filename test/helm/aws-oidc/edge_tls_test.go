@@ -225,6 +225,51 @@ var _ = Describe("Edge TLS", func() {
 		})
 	})
 
+	// The in-tree controller tags the NLB with only its own cluster/service tags, so a
+	// consumer's tag-based sweep or cost attribution never finds it (#98). The tag scheme is
+	// the deployment's call, so nothing is rendered by default.
+	Context("additional resource tags", func() {
+		const tagsAnnotation = "aws-load-balancer-additional-resource-tags"
+
+		It("adds no tags when unset", func() {
+			Expect(readFile(renderTLS(), "traefik/service.yaml")).NotTo(ContainSubstring(tagsAnnotation))
+		})
+
+		It("renders pairs sorted, so the Service does not churn between upgrades", func() {
+			dir := renderTLS(
+				helmSetFlag, "traefik.additionalResourceTags.Owner=team-a",
+				helmSetFlag, "traefik.additionalResourceTags.DeploymentId=abc-123",
+			)
+			Expect(readFile(dir, "traefik/service.yaml")).To(ContainSubstring(
+				tagsAnnotation + `: "DeploymentId=abc-123,Owner=team-a"`))
+		})
+
+		It("renders a slash- or colon-bearing tag key as-is", func() {
+			dir := renderTLS(helmSetFlag, `traefik.additionalResourceTags.example\.com/team:name=a`)
+			Expect(readFile(dir, "traefik/service.yaml")).To(ContainSubstring(
+				tagsAnnotation + `: "example.com/team:name=a"`))
+		})
+
+		// The controller splits the annotation on "," then "=", so a separator inside a key
+		// or value silently yields wrong tags instead of an error.
+		It("rejects keys or values containing a separator", func() {
+			chartDir := GinkgoT().TempDir()
+			copyDir(filepath.Join(rootDir, "charts/aws-oidc"), chartDir)
+
+			for _, tc := range []struct{ name, flag string }{
+				{"comma in value", `traefik.additionalResourceTags.Team=a\,b`},
+				{"equals in value", `traefik.additionalResourceTags.Team=a\=b`},
+				{"equals in key", `traefik.additionalResourceTags.a\=b=c`},
+			} {
+				args := append([]string{helmTemplateCmd, helmReleaseName, chartDir}, oidcRequiredArgs()...)
+				args = append(args, helmSetFlag, tc.flag)
+				out, err := exec.Command("helm", args...).CombinedOutput()
+				Expect(err).To(HaveOccurred(), "%s: expected rejection, got:\n%s", tc.name, string(out))
+				Expect(string(out)).To(ContainSubstring("uses as separators"), tc.name)
+			}
+		})
+	})
+
 	Context("certificate ARN shape", func() {
 		const arnFlag = "tls.acm.certificateArn="
 

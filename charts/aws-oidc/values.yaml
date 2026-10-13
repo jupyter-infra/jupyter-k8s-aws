@@ -137,6 +137,16 @@ traefik:
   # a combination that would target nodes Traefik cannot run on, since that yields a
   # target group which never passes a health check.
   targetNodeLabels: {}
+  # Extra AWS tags for the NLB, its target groups and its managed security group, given as
+  # key/value pairs. Empty ({}) leaves only the cloud provider's own tags
+  # (kubernetes.io/cluster/<name>, kubernetes.io/service-name), which a consumer's
+  # tag-based cleanup or cost attribution cannot match. Example:
+  #
+  #   additionalResourceTags:
+  #     <tag-key>: <tag-value>
+  #
+  # Keys and values must not contain "," or "=", which the annotation uses as separators.
+  additionalResourceTags: {}
   # Redirect HTTP to HTTPS
   redirectHttp: true
   # Whether to configure traefik at 'debug' log level ('info' if omitted)
