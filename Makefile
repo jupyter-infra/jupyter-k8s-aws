@@ -191,6 +191,8 @@ helm-test-aws-oidc: ## Render and test aws-oidc chart
 .PHONY: helm-test-aws-hyperpod
 helm-test-aws-hyperpod: ## Render and test aws-hyperpod chart
 	rm -rf dist/test-output/aws-hyperpod
+	rm -rf dist/test-output/aws-hyperpod-no-remote-access
+	rm -rf dist/test-output/aws-hyperpod-direct-ssh
 	rm -rf /tmp/helm-test-chart
 	cp -r $(CHART_HYPERPOD) /tmp/helm-test-chart
 	cd /tmp/helm-test-chart && helm dependency build
@@ -205,6 +207,19 @@ helm-test-aws-hyperpod: ## Render and test aws-hyperpod chart
 		--set remoteAccess.ssmSidecarImage.repository=ssm-sidecar \
 		--set remoteAccess.ssmSidecarImage.tag=latest \
 		--set clusterWebUI.auth.enableBearerAuth=true
+	helm template jk8s /tmp/helm-test-chart --output-dir dist/test-output/aws-hyperpod-no-remote-access \
+		--set remoteAccess.enabled=false \
+		--set remoteAccess.ssmSidecarImage.containerRegistry=123456789.dkr.ecr.us-east-1.amazonaws.com \
+		--set remoteAccess.ssmSidecarImage.repository=workspace-sidecar \
+		--set remoteAccess.ssmSidecarImage.tag=latest \
+		--set directSSH.enabled=false
+	helm template jk8s /tmp/helm-test-chart --output-dir dist/test-output/aws-hyperpod-direct-ssh \
+		--set remoteAccess.enabled=false \
+		--set directSSH.enabled=true \
+		--set directSSH.domain=workspaces.internal \
+		--set directSSH.initImage.containerRegistry=123456789.dkr.ecr.us-east-1.amazonaws.com \
+		--set directSSH.initImage.repository=workspace-native-ssh-sidecar \
+		--set directSSH.initImage.tag=latest
 	rm -rf /tmp/helm-test-chart
 	go test ./test/helm/aws-hyperpod -v
 
