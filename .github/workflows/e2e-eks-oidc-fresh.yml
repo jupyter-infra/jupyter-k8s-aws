@@ -286,7 +286,7 @@ jobs:
       ref: ${{ inputs.ref }}
       ecr-tag: ${{ needs.build-image.outputs.ecr-tag }}
       oauth-app-num: ${{ inputs.oauth-app-num }}
-      marker: mutating
+      marker: mutating and not gpu
       mutate: true
       timeout-minutes: 60
     permissions:

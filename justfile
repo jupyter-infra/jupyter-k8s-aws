@@ -227,7 +227,7 @@ test-e2e-eks-oidc project_dir=e2e_dir test_filter="" options="":
                 ci-dir)        CI_DIR_OPT="--ci-dir $val" ;;
                 skip-sync)     [ "$val" = "true" ] && SKIP_SYNC="true" ;;
                 mutate)        [ "$val" = "true" ] && MUTATING_OPT="--with-mutating-cases" ;;
-                marker)        MARKER_OPT="-m $val" ;;
+                marker)        MARKER_OPT="-m \"$val\"" ;;
                 full-deploy)   [ "$val" = "true" ] && FULL_DEPLOY_OPT="--with-full-deployment" ;;
             esac
         done
