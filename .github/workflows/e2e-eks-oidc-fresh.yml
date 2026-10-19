@@ -81,11 +81,7 @@ jobs:
 
   cleanup-existing:
     name: "Cleanup existing deployment"
-    # TEMPORARY: hardcoded off. find-takedown-eks has been failing on stale/dirty
-    # projects and blocking the v0.2.0 release. The target subdomain is currently
-    # clean (no existing cluster), so cleanup is a no-op we can skip. REVERT to
-    # `${{ !inputs.skip-deployment }}` once v0.2.0 is out.
-    if: false
+    if: ${{ !inputs.skip-deployment }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     environment: e2e-fresh
@@ -136,9 +132,7 @@ jobs:
 
   deploy:
     name: "Deploy from scratch"
-    # cleanup-existing is temporarily hardcoded off (see its comment); dropped from
-    # needs so deploy still runs. REVERT to [build-image, cleanup-existing] with it.
-    needs: [build-image]
+    needs: [build-image, cleanup-existing]
     if: ${{ !inputs.skip-deployment }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -200,18 +194,40 @@ jobs:
         id: deploy
         run: JD_DIR=jupyter-deploy just ci-e2e-eks-deploy sandbox-e2e sandbox-ci
 
-      - name: Upgrade aws-oidc chart from branch
+      - name: Point kubectl at the deployed cluster
+        id: kubeconfig
         if: success()
         run: |
           CLUSTER=$(cd sandbox-e2e && uv run --project ../jupyter-deploy jd show -o cluster_name --text)
           aws eks update-kubeconfig --name "$CLUSTER" --region ${{ vars.AWS_REGION }}
+
+      - name: Upgrade aws-oidc chart from branch
+        id: upgrade
+        if: success()
+        run: |
+          # --reset-then-reuse-values keeps the values the template set on the release,
+          # the ACM certificate ARN included, so the candidate chart serves the same TLS.
           helm upgrade jupyter-k8s-aws-oidc charts/aws-oidc \
             -n jupyter-k8s-router \
             --reset-then-reuse-values \
-            --set certManager=null \
-            --set tls.mode=null \
-            --set tls.acm.certificateArn=${{ vars.E2E_ACM_CERT_ARN }} \
-            --wait --timeout 5m
+            --wait --timeout 10m
+
+      - name: Router state after a failed upgrade
+        if: failure() && steps.kubeconfig.outcome == 'success' && steps.upgrade.outcome == 'failure'
+        run: |
+          kubectl get pods -n jupyter-k8s-router -o wide || true
+          kubectl get events -n jupyter-k8s-router --sort-by=.lastTimestamp | tail -40 || true
+          # A pod failing its readiness probe stays in phase Running, so select on the Ready
+          # condition; a completed rotator job pod is never Ready, so skip phase Succeeded.
+          NOT_READY=$(kubectl get pods -n jupyter-k8s-router -o json \
+            | jq -r '.items[] | select(.status.phase != "Succeeded")
+              | select([.status.conditions[]? | select(.type=="Ready" and .status=="True")] | length == 0) | .metadata.name')
+          for pod in $NOT_READY; do
+            kubectl describe pod "$pod" -n jupyter-k8s-router | tail -40 || true
+            # A crash-looping container's error is in its previous instance's log.
+            kubectl logs "$pod" -n jupyter-k8s-router --all-containers --tail=50 || true
+            kubectl logs "$pod" -n jupyter-k8s-router --all-containers --tail=50 --previous || true
+          done
 
       - name: Refresh auth state (full GitHub login)
         if: success()
@@ -244,8 +260,7 @@ jobs:
 
   deploy-gate:
     name: "Deploy gate"
-    # cleanup-existing temporarily removed from needs (hardcoded off). REVERT with it.
-    needs: [build-image, deploy]
+    needs: [build-image, cleanup-existing, deploy]
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     timeout-minutes: 1
@@ -286,7 +301,7 @@ jobs:
       ref: ${{ inputs.ref }}
       ecr-tag: ${{ needs.build-image.outputs.ecr-tag }}
       oauth-app-num: ${{ inputs.oauth-app-num }}
-      marker: mutating
+      marker: mutating and not gpu
       mutate: true
       timeout-minutes: 60
     permissions:

@@ -175,7 +175,10 @@ ci-e2e-eks-deploy project_dir=e2e_dir ci_dir=ci_dir:
     OVERRIDE_FILE="$ROOT/docker-compose.e2e-override.yml"
     printf 'services:\n  e2e:\n    image: jupyter-k8s-aws-e2e:latest\n    volumes:\n      - ./{{project_dir}}:/workspace/{{project_dir}}\n      - ./{{ci_dir}}:/workspace/{{ci_dir}}\n' > "$OVERRIDE_FILE"
     trap 'rm -f "$OVERRIDE_FILE"' EXIT
+    # Both are bind-mounted by the compose file; Docker creates a missing mount source as
+    # root, which the container user cannot write to.
     mkdir -p "$HOME/.kube"
+    mkdir -p "$HOME/.terraform.d/plugin-cache"
     {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" down
     {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" -f "$OVERRIDE_FILE" up -d --no-build
     EXEC="{{container_tool}} compose --project-directory $ROOT -f $E2E_COMPOSE exec -e PYTHONUNBUFFERED=1 e2e bash -c"
@@ -224,7 +227,7 @@ test-e2e-eks-oidc project_dir=e2e_dir test_filter="" options="":
                 ci-dir)        CI_DIR_OPT="--ci-dir $val" ;;
                 skip-sync)     [ "$val" = "true" ] && SKIP_SYNC="true" ;;
                 mutate)        [ "$val" = "true" ] && MUTATING_OPT="--with-mutating-cases" ;;
-                marker)        MARKER_OPT="-m $val" ;;
+                marker)        MARKER_OPT="-m \"$val\"" ;;
                 full-deploy)   [ "$val" = "true" ] && FULL_DEPLOY_OPT="--with-full-deployment" ;;
             esac
         done
@@ -253,7 +256,10 @@ test-e2e-eks-oidc project_dir=e2e_dir test_filter="" options="":
         fi
     } > "$OVERRIDE_FILE"
     trap 'rm -f "$OVERRIDE_FILE"' EXIT
+    # Both are bind-mounted by the compose file; Docker creates a missing mount source as
+    # root, which the container user cannot write to.
     mkdir -p "$HOME/.kube"
+    mkdir -p "$HOME/.terraform.d/plugin-cache"
     {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" down
     {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" -f "$OVERRIDE_FILE" up -d --no-build
     {{container_tool}} compose --project-directory "$ROOT" -f "$E2E_COMPOSE" exec -e PYTHONUNBUFFERED=1 e2e \
