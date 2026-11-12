@@ -295,7 +295,7 @@ accessStrategy:
       imagePullPolicy: Always
       repository: ghcr.io/jupyter-infra
       imageName: workspace-websocket-proxy
-      imageTag: v0.1.0-rc.1
+      imageTag: v0.1.0-rc.2
     resources:
       limits:
         cpu: 200m
