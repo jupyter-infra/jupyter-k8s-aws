@@ -91,7 +91,7 @@ var _ = Describe("OAuth2 Proxy", func() {
 			Expect(pod.ServiceAccountName).To(Equal("oauth2-proxy-cert-restart"))
 			Expect(pod.Containers).To(HaveLen(1))
 			c := pod.Containers[0]
-			Expect(c.Image).To(Equal("registry.k8s.io/kubectl:v1.37.2"))
+			Expect(c.Image).To(Equal("registry.k8s.io/kubectl:v1.37.3"))
 			Expect(c.Args).To(HaveExactElements(
 				"rollout", "restart", "deployment/oauth2-proxy",
 				"--namespace=jupyter-k8s-router", "--cache-dir=/tmp/kube-cache"))
